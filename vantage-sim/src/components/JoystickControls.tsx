@@ -49,6 +49,12 @@ export function JoystickControls({ onStatusChange }: Props) {
     [onStatusChange]
   );
 
+  // Keep doMove reference fresh for the event listener without triggering useEffect re-runs
+  const doMoveRef = useRef(doMove);
+  useEffect(() => {
+    doMoveRef.current = doMove;
+  }, [doMove]);
+
   // nipple.js real joystick for X/Z world plane (screen X/Y)
   useEffect(() => {
     if (!joystickRef.current) return;
@@ -91,7 +97,7 @@ export function JoystickControls({ onStatusChange }: Props) {
 
         // Map 2D joystick polar angle to Three.js world X/Z:
         //   nipplejs angle 0 = right (+X), 90 = up (-Z in Three.js)
-        doMove({
+        doMoveRef.current({
           x: v.x + Math.cos(angle) * speed,
           y: v.y,           // Y height controlled by slider
           z: v.z - Math.sin(angle) * speed,
@@ -99,8 +105,12 @@ export function JoystickControls({ onStatusChange }: Props) {
       });
     });
 
-    return () => manager?.destroy();
-  }, [doMove]);
+    return () => {
+      if (manager) {
+        manager.destroy();
+      }
+    };
+  }, []); // Run exactly once on mount to avoid rebuilding the DOM elements during drag
 
   // Seed starting position when robot loads
   useEffect(() => {
