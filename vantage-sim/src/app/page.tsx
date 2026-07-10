@@ -161,48 +161,59 @@ export default function Home() {
         </nav>
 
         {/* ── Main Grid ────────────────────────────────────────────────── */}
+        {/* ── Main Grid ────────────────────────────────────────────────── */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 360px 280px",
+            gridTemplateColumns: "1fr 360px",
             gap: "20px",
             alignItems: "start",
           }}
           className="grid-layout"
         >
-          {/* Column 1 — Scene View */}
-          <div
-            className="panel"
-            style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <p
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: "17px", color: "var(--walnut-900)", margin: 0, letterSpacing: "0.01em" }}
-              >
-                Digital twin — scene view
-              </p>
-              <span className="text-[11px] font-mono text-[--steel-600]">
-                urdf-loader &middot; Three.js
-              </span>
-            </div>
-
-            {/* 3D Viewport */}
+          {/* Column 1 — Scene View & Telemetry Panel (stacked vertically) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Scene View */}
             <div
-              className="scene-grid-bg relative overflow-hidden"
-              style={{
-                width: "100%",
-                height: "420px",
-                border: "1px solid var(--steel-200)",
-                borderRadius: "3px",
-              }}
+              className="panel"
+              style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
             >
-              <SceneWrapper />
+              <div className="flex items-center justify-between mb-3">
+                <p
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: "17px", color: "var(--walnut-900)", margin: 0, letterSpacing: "0.01em" }}
+                >
+                  Digital twin — scene view
+                </p>
+                <span className="text-[11px] font-mono text-[--steel-600]">
+                  urdf-loader &middot; Three.js
+                </span>
+              </div>
+
+              {/* 3D Viewport */}
+              <div
+                className="scene-grid-bg relative overflow-hidden"
+                style={{
+                  width: "100%",
+                  height: "420px",
+                  border: "1px solid var(--steel-200)",
+                  borderRadius: "3px",
+                }}
+              >
+                <SceneWrapper />
+              </div>
+
+              <p style={{ fontSize: "12px", color: "var(--steel-600)", marginTop: "10px", marginBottom: 0 }}>
+                Rendered from the provided URDF via urdf-loader. Drag to orbit &middot; scroll to zoom &middot; right-drag to pan.{" "}
+                <b style={{ color: "var(--walnut-700)", fontWeight: 500 }}>Approach → touch → retract</b> per digit, verified within ±5 mm.
+              </p>
             </div>
 
-            <p style={{ fontSize: "12px", color: "var(--steel-600)", marginTop: "10px", marginBottom: 0 }}>
-              Rendered from the provided URDF via urdf-loader. Drag to orbit &middot; scroll to zoom &middot; right-drag to pan.{" "}
-              <b style={{ color: "var(--walnut-700)", fontWeight: 500 }}>Approach → touch → retract</b> per digit, verified within ±5 mm.
-            </p>
+            {/* Telemetry (placed below scene view) */}
+            <div
+              style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
+            >
+              <TelemetryPanel />
+            </div>
           </div>
 
           {/* Column 2 — Active Control Surface */}
@@ -221,13 +232,6 @@ export default function Home() {
             {activeTab === "keyboard" && <KeyboardControls {...controlProps} />}
             {activeTab === "voice" && <VoiceControls {...controlProps} />}
             {activeTab === "pin" && <PinControls {...controlProps} />}
-          </div>
-
-          {/* Column 3 — Telemetry */}
-          <div
-            style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
-          >
-            <TelemetryPanel />
           </div>
         </div>
 
