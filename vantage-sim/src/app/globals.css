@@ -64,3 +64,40 @@ body {
     linear-gradient(90deg, var(--steel-200) 1px, transparent 1px) 0 0/28px 28px,
     var(--steel-100);
 }
+
+/* ── NippleJS Custom Premium Styling ──────────────────────────────── */
+.nipple {
+  position: absolute;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.nipple .back {
+  border-radius: 50% !important;
+  background: rgba(184, 118, 63, 0.22) !important; /* Semi-transparent copper */
+  border: 2px solid var(--copper) !important;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+  transition: background 0.2s ease;
+}
+
+.nipple:hover .back,
+.nipple.active .back {
+  background: rgba(184, 118, 63, 0.35) !important;
+}
+
+.nipple .front {
+  border-radius: 50% !important;
+  background: var(--walnut-900) !important; /* Dark solid walnut knob */
+  box-shadow: 0 4px 10px rgba(42, 29, 20, 0.45), 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  transition: transform 0.1s ease;
+}
+
+/* Fallback for the teammate's blue style joystick */
+.nipple .front[style*="3b82f6"] {
+  background: #1e3a8a !important;
+}
+.nipple .back[style*="3b82f6"] {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: #3b82f6 !important;
+}
