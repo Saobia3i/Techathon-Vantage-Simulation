@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<!--
+  PLACEHOLDER URDF — Vantage 6-DOF arm (cylinder primitives, no external meshes)
+  
+  Replace this file with the organizer-provided arm.urdf — zero code changes needed.
+  
+  Conventions:
+    • Z-up (standard URDF/ROS convention)
+    • Units: meters
+    • 6 revolute joints (joint1–joint6) + fixed stylus tip
+    • Joint limits are approximate; replace with real values from Vantage spec
+  
+  TODO (Phase 1): After loading, open browser console and inspect:
+    Object.keys(robot.joints)  →  confirm joint names
+    Object.keys(robot.links)   →  find the stylus tip link name
+    Then hardcode stylusLinkName in robotStore.ts
+-->
+<robot name="vantage_arm">
+
+  <!-- ═══════════════════════════════════════════════
+       LINKS
+  ═══════════════════════════════════════════════ -->
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.06" length="0.05"/>
+      </geometry>
+      <origin xyz="0 0 0.025" rpy="0 0 0"/>
+      <material name="dark_grey"><color rgba="0.2 0.2 0.2 1"/></material>
+    </visual>
+  </link>
+
+  <link name="link1">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.14"/>
+      </geometry>
+      <origin xyz="0 0 0.07" rpy="0 0 0"/>
+      <material name="blue"><color rgba="0.1 0.4 0.8 1"/></material>
+    </visual>
+  </link>
+
+  <link name="link2">
+    <visual>
+      <geometry>
+        <cylinder radius="0.035" length="0.22"/>
+      </geometry>
+      <origin xyz="0 0 0.11" rpy="0 0 0"/>
+      <material name="light_grey"><color rgba="0.7 0.7 0.75 1"/></material>
+    </visual>
+  </link>
+
+  <link name="link3">
+    <visual>
+      <geometry>
+        <cylinder radius="0.03" length="0.18"/>
+      </geometry>
+      <origin xyz="0 0 0.09" rpy="0 0 0"/>
+      <material name="blue"><color rgba="0.1 0.4 0.8 1"/></material>
+    </visual>
+  </link>
+
+  <link name="link4">
+    <visual>
+      <geometry>
+        <cylinder radius="0.025" length="0.15"/>
+      </geometry>
+      <origin xyz="0 0 0.075" rpy="0 0 0"/>
+      <material name="light_grey"><color rgba="0.7 0.7 0.75 1"/></material>
+    </visual>
+  </link>
+
+  <link name="link5">
+    <visual>
+      <geometry>
+        <cylinder radius="0.022" length="0.12"/>
+      </geometry>
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <material name="blue"><color rgba="0.1 0.4 0.8 1"/></material>
+    </visual>
+  </link>
+
+  <link name="link6">
+    <visual>
+      <geometry>
+        <cylinder radius="0.018" length="0.07"/>
+      </geometry>
+      <origin xyz="0 0 0.035" rpy="0 0 0"/>
+      <material name="dark_grey"><color rgba="0.2 0.2 0.2 1"/></material>
+    </visual>
+  </link>
+
+  <!--
+    stylus_tip — fixed end-effector link.
+    TODO: confirm this name matches the real URDF and hardcode in robotStore.ts
+  -->
+  <link name="stylus_tip">
+    <visual>
+      <geometry>
+        <cylinder radius="0.004" length="0.04"/>
+      </geometry>
+      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <material name="white"><color rgba="0.95 0.95 0.95 1"/></material>
+    </visual>
+  </link>
+
+  <!-- ═══════════════════════════════════════════════
+       JOINTS
+  ═══════════════════════════════════════════════ -->
+
+  <!-- J1: Base rotation (yaw) -->
+  <joint name="joint1" type="revolute">
+    <parent link="base_link"/>
+    <child link="link1"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- J2: Shoulder pitch -->
+  <joint name="joint2" type="revolute">
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0 0 0.14" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.5708" upper="1.5708" effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- J3: Elbow pitch -->
+  <joint name="joint3" type="revolute">
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0 0 0.22" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.5708" upper="1.5708" effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- J4: Forearm roll -->
+  <joint name="joint4" type="revolute">
+    <parent link="link3"/>
+    <child link="link4"/>
+    <origin xyz="0 0 0.18" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="50" velocity="1.5"/>
+  </joint>
+
+  <!-- J5: Wrist pitch -->
+  <joint name="joint5" type="revolute">
+    <parent link="link4"/>
+    <child link="link5"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.5708" upper="1.5708" effort="50" velocity="1.5"/>
+  </joint>
+
+  <!-- J6: Wrist roll -->
+  <joint name="joint6" type="revolute">
+    <parent link="link5"/>
+    <child link="link6"/>
+    <origin xyz="0 0 0.12" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="30" velocity="2.0"/>
+  </joint>
+
+  <!-- Fixed stylus tip — end-effector, no motion -->
+  <joint name="stylus_joint" type="fixed">
+    <parent link="link6"/>
+    <child link="stylus_tip"/>
+    <origin xyz="0 0 0.07" rpy="0 0 0"/>
+  </joint>
+
+</robot>
