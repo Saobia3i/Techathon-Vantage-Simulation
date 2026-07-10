@@ -39,45 +39,45 @@ export function Dashboard() {
   const keyCount = Object.keys(keyPositions).length;
 
   return (
-    <aside className="flex flex-col gap-4 h-full overflow-y-auto bg-[#0a0a12] border-l border-white/[0.06] px-4 py-5">
+    <aside className="flex flex-col gap-4 h-full overflow-y-auto bg-white border-l border-slate-200/80 px-4 py-5">
 
       {/* Header */}
       <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-white/40">
+        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
           Live Dashboard
         </span>
       </div>
 
       {/* ── Joint State ─────────────────────────────────────────────── */}
-      <section className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-white/40 mb-3">
+      <section className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
           Joint State
         </h3>
 
         {jointNames.length === 0 ? (
-          <p className="text-xs text-white/20 italic">Loading URDF…</p>
+          <p className="text-xs text-slate-400 italic">Loading URDF…</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-[10px] text-white/30 uppercase">
+              <tr className="text-[10px] text-slate-400 uppercase">
                 <th className="text-left pb-2 font-medium">Joint</th>
                 <th className="text-right pb-2 font-medium">Angle</th>
                 <th className="text-right pb-2 font-medium">Rad</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.04]">
+            <tbody className="divide-y divide-slate-100">
               {jointNames.map((name, i) => {
                 const rad = currentAngles[i] ?? 0;
                 return (
                   <tr key={name} className="group">
-                    <td className="py-1.5 pr-3 text-white/50 font-mono text-xs group-hover:text-white/70 transition-colors">
+                    <td className="py-1.5 pr-3 text-slate-500 font-mono text-xs group-hover:text-slate-700 transition-colors">
                       {name}
                     </td>
-                    <td className="py-1.5 text-right text-white font-mono text-xs tabular-nums">
+                    <td className="py-1.5 text-right text-slate-800 font-mono text-xs tabular-nums">
                       {formatAngle(rad)}
                     </td>
-                    <td className="py-1.5 pl-2 text-right text-white/30 font-mono text-[10px] tabular-nums">
+                    <td className="py-1.5 pl-2 text-right text-slate-400 font-mono text-[10px] tabular-nums">
                       {rad.toFixed(3)}
                     </td>
                   </tr>
@@ -89,27 +89,27 @@ export function Dashboard() {
       </section>
 
       {/* ── End-Effector Position ───────────────────────────────────── */}
-      <section className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-white/40 mb-3">
+      <section className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
           End-Effector
         </h3>
 
         {!stylusLinkName ? (
-          <p className="text-xs text-amber-400/70 italic">
+          <p className="text-xs text-amber-600/80 italic">
             stylusLinkName not set — check console for link names after URDF loads,
             then hardcode in robotStore.ts.
           </p>
         ) : !endEffectorPos ? (
-          <p className="text-xs text-white/20 italic">Waiting for robot…</p>
+          <p className="text-xs text-slate-400 italic">Waiting for robot…</p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
             {(["x", "y", "z"] as const).map((axis) => (
               <div
                 key={axis}
-                className="rounded-lg bg-white/[0.04] border border-white/[0.05] p-2 text-center"
+                className="rounded-lg bg-white border border-slate-200 p-2 text-center"
               >
-                <div className="text-[10px] text-white/40 uppercase mb-1">{axis}</div>
-                <div className="font-mono text-xs text-white tabular-nums">
+                <div className="text-[10px] text-slate-400 uppercase mb-1">{axis}</div>
+                <div className="font-mono text-xs text-slate-800 tabular-nums">
                   {formatPos(endEffectorPos[axis])}
                 </div>
               </div>
@@ -117,28 +117,28 @@ export function Dashboard() {
           </div>
         )}
 
-        <div className="mt-3 text-[10px] text-white/25 font-mono">
-          Link: <span className="text-white/40">{stylusLinkName || "—"}</span>
+        <div className="mt-3 text-[10px] text-slate-400 font-mono">
+          Link: <span className="text-slate-600 font-semibold">{stylusLinkName || "—"}</span>
         </div>
       </section>
 
       {/* ── Key Panel Status ────────────────────────────────────────── */}
-      <section className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-white/40 mb-3">
+      <section className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
           Key Panel
         </h3>
 
         {keyCount === 0 ? (
-          <p className="text-xs text-white/20 italic">Loading key.config.json…</p>
+          <p className="text-xs text-slate-400 italic">Loading key.config.json…</p>
         ) : (
           <div className="grid grid-cols-3 gap-1.5">
             {Object.entries(keyPositions).map(([digit, pos]) => (
               <div
                 key={digit}
-                className="rounded-lg bg-white/[0.04] border border-white/[0.05] p-1.5 text-center"
+                className="rounded-lg bg-white border border-slate-200 p-1.5 text-center"
               >
-                <div className="text-sm font-bold text-white mb-1">{digit}</div>
-                <div className="text-[9px] text-white/30 font-mono leading-tight">
+                <div className="text-sm font-bold text-slate-800 mb-1">{digit}</div>
+                <div className="text-[9px] text-slate-400 font-mono leading-tight">
                   {pos.x.toFixed(2)}<br />
                   {pos.y.toFixed(2)}<br />
                   {pos.z.toFixed(2)}
@@ -148,15 +148,15 @@ export function Dashboard() {
           </div>
         )}
 
-        <div className="mt-2 text-[10px] text-white/25">
+        <div className="mt-2 text-[10px] text-slate-400">
           {keyCount} key{keyCount !== 1 ? "s" : ""} loaded · base-frame coords
         </div>
       </section>
 
       {/* ── Architecture Note ───────────────────────────────────────── */}
-      <section className="rounded-xl bg-blue-950/30 border border-blue-500/10 p-3 mt-auto">
-        <p className="text-[10px] text-blue-300/50 leading-relaxed">
-          All motion goes through <code className="text-blue-300/70">moveTo(x,y,z)</code>.
+      <section className="rounded-xl bg-blue-50 border border-blue-100 p-3 mt-auto">
+        <p className="text-[10px] text-blue-700/80 leading-relaxed">
+          All motion goes through <code className="text-blue-800 font-semibold">moveTo(x,y,z)</code>.
           This panel is read-only.
         </p>
       </section>

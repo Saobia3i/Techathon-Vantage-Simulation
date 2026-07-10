@@ -6,7 +6,7 @@ export default function Home() {
     <main className="flex flex-col h-screen overflow-hidden">
 
       {/* ── Top bar ─────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#08080f] shrink-0">
+      <header className="flex items-center justify-between px-5 py-3 border-b border-slate-200/80 bg-white shrink-0">
         <div className="flex items-center gap-3">
           {/* Vantage logo mark */}
           <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
@@ -15,10 +15,10 @@ export default function Home() {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-white leading-none">
+            <h1 className="text-sm font-semibold text-slate-800 leading-none">
               Vantage Robotics
             </h1>
-            <p className="text-[10px] text-white/30 mt-0.5 font-mono">
+            <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
               Digital Twin · Phase 1
             </p>
           </div>
@@ -41,7 +41,7 @@ export default function Home() {
 
           {/* Overlay hint */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none">
-            <p className="text-[10px] text-white/20 font-mono bg-black/20 backdrop-blur px-3 py-1.5 rounded-full border border-white/[0.04]">
+            <p className="text-[10px] text-slate-500 font-mono bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200/80">
               Drag to orbit · Scroll to zoom · Right-drag to pan
             </p>
           </div>
@@ -64,13 +64,13 @@ function StatusChip({
   label: string;
 }) {
   const dotClass = {
-    emerald: "bg-emerald-400",
-    blue:    "bg-blue-400",
-    violet:  "bg-violet-400",
+    emerald: "bg-emerald-500",
+    blue:    "bg-blue-500",
+    violet:  "bg-violet-500",
   }[color];
 
   return (
-    <div className="flex items-center gap-1.5 text-white/40">
+    <div className="flex items-center gap-1.5 text-slate-500">
       <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
       {label}
     </div>
