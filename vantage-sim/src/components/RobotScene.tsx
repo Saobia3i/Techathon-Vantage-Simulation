@@ -115,6 +115,9 @@ export function RobotScene() {
         const store = useRobotStore.getState();
         store.setRobot(robot);
 
+        // Expose to window for easy console testing (Checklist Step 6)
+        (window as any).robot = robot;
+
         const jointNames = Object.keys(robot.joints);
         const linkNames = Object.keys(robot.links);
         store.setJointNames(jointNames);
