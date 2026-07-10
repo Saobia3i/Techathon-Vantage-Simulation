@@ -1,12 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Vantage Robotics — Digital Twin",
@@ -22,8 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="antialiased bg-[#0d0d14] text-white overflow-hidden h-screen">
+    <html lang="en">
+      <body className="antialiased bg-[#f8fafc] text-[#0f172a] overflow-hidden h-screen">
         {children}
       </body>
     </html>

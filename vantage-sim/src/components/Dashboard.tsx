@@ -1,15 +1,20 @@
 "use client";
 
-/**
- * Dashboard — live read-only panel showing joint state + end-effector position.
- *
- * Reads from robotStore (Zustand). Never writes joint values.
- * End-effector position is derived from getWorldPosition() on the stylus link.
- */
 import { useRobotStore } from "@/state/robotStore";
 import * as THREE from "three";
+import { useState } from "react";
+import { moveTo } from "@/lib/moveTo";
 
 const RAD_TO_DEG = 180 / Math.PI;
+
+const KEY_COLORS_MAP: Record<string, string> = {
+  "1": "bg-[#ff4d6d]",
+  "2": "bg-[#ff8c42]",
+  "3": "bg-[#ffe14d]",
+  "4": "bg-[#4dffb8]",
+  "5": "bg-[#4dc3ff]",
+  "6": "bg-[#b44dff]",
+};
 
 function formatAngle(rad: number): string {
   return (rad * RAD_TO_DEG).toFixed(1) + "°";
@@ -26,6 +31,8 @@ export function Dashboard() {
   const stylusLinkName = useRobotStore((s) => s.stylusLinkName);
   const keyPositions  = useRobotStore((s) => s.keyPositions);
 
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
   // End-effector world position — derived live from Three.js scene graph
   const endEffectorPos = (() => {
     if (!robot || !stylusLinkName) return null;
@@ -38,6 +45,21 @@ export function Dashboard() {
 
   const keyCount = Object.keys(keyPositions).length;
 
+  const handleKeyClick = (digit: string, pos: { x: number; y: number; z: number }) => {
+    setStatusMessage(`Moving to Key ${digit}...`);
+    
+    // Call the moveTo API contract
+    const result = moveTo(pos);
+    
+    setTimeout(() => {
+      if (result.success) {
+        setStatusMessage(`Reached Key ${digit} (x: ${pos.x}, y: ${pos.y}, z: ${pos.z})`);
+      } else {
+        setStatusMessage(`Failed: ${result.reason || "unknown error"}`);
+      }
+    }, 600);
+  };
+
   return (
     <aside className="flex flex-col gap-4 h-full overflow-y-auto bg-white border-l border-slate-200/80 px-4 py-5">
 
@@ -48,6 +70,19 @@ export function Dashboard() {
           Live Dashboard
         </span>
       </div>
+
+      {/* ── Status Message Alert ────────────────────────────────────── */}
+      {statusMessage && (
+        <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700 font-mono animate-fade-in flex items-center justify-between">
+          <span>{statusMessage}</span>
+          <button 
+            onClick={() => setStatusMessage(null)}
+            className="text-blue-400 hover:text-blue-600 font-bold ml-2 cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* ── Joint State ─────────────────────────────────────────────── */}
       <section className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">
@@ -125,31 +160,36 @@ export function Dashboard() {
       {/* ── Key Panel Status ────────────────────────────────────────── */}
       <section className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
-          Key Panel
+          Key Panel (Test Panel)
         </h3>
 
         {keyCount === 0 ? (
           <p className="text-xs text-slate-400 italic">Loading key.config.json…</p>
         ) : (
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {Object.entries(keyPositions).map(([digit, pos]) => (
-              <div
+              <button
                 key={digit}
-                className="rounded-lg bg-white border border-slate-200 p-1.5 text-center"
+                onClick={() => handleKeyClick(digit, pos)}
+                className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm active:scale-95 transition-all text-left group cursor-pointer"
+                title={`Coords: x=${pos.x.toFixed(3)}, y=${pos.y.toFixed(3)}, z=${pos.z.toFixed(3)}`}
               >
-                <div className="text-sm font-bold text-slate-800 mb-1">{digit}</div>
-                <div className="text-[9px] text-slate-400 font-mono leading-tight">
-                  {pos.x.toFixed(2)}<br />
-                  {pos.y.toFixed(2)}<br />
-                  {pos.z.toFixed(2)}
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${KEY_COLORS_MAP[digit] || "bg-slate-400"}`} />
+                  <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-500 transition-colors">
+                    Key {digit}
+                  </span>
                 </div>
-              </div>
+                <span className="text-[9px] text-slate-400 font-mono">
+                  {pos.x.toFixed(2)}, {pos.z.toFixed(2)}
+                </span>
+              </button>
             ))}
           </div>
         )}
 
-        <div className="mt-2 text-[10px] text-slate-400">
-          {keyCount} key{keyCount !== 1 ? "s" : ""} loaded · base-frame coords
+        <div className="mt-2.5 text-[10px] text-slate-400">
+          {keyCount} keys loaded · Click any key to trigger test motion
         </div>
       </section>
 
