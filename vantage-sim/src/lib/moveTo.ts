@@ -153,6 +153,10 @@ export function moveTo(target: Vector3Like): IKResult {
       // J_i = axis × (eePos − jointPos)
       const diff = new THREE.Vector3().subVectors(eePos, jointPos);
       J.push(new THREE.Vector3().crossVectors(jointAxis, diff));
+
+      if (iter === 0) {
+        console.log(`[moveTo debug] Joint ${activeNames[i]} | Local axis: (${joint.axis.x}, ${joint.axis.y}, ${joint.axis.z}) | World axis: (${jointAxis.x.toFixed(3)}, ${jointAxis.y.toFixed(3)}, ${jointAxis.z.toFixed(3)}) | World pos: (${jointPos.x.toFixed(3)}, ${jointPos.y.toFixed(3)}, ${jointPos.z.toFixed(3)})`);
+      }
     }
 
     // ── Compute A = J·J^T + λ²·I  (3×3) ────────────────────────────────
