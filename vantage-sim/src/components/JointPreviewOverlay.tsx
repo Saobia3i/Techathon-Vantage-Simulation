@@ -119,10 +119,10 @@ export function JointPreviewOverlay() {
 
     // Projection mapping from 3D to 2D canvas:
     // We map side-profile: horizontal = Z extension (robot is rotated), vertical = Y height.
-    // Center the base at x = 50px, y = floorY
-    const scaleZ = 165; // px/m (scaled up from 120)
-    const scaleY = 165; // px/m (scaled up from 120)
-    const originX = 50;
+    // Center the base at x = 35px, y = floorY
+    const scaleZ = 110; // px/m (scaled down from 165 for compact view)
+    const scaleY = 110; // px/m (scaled up from 165 for compact view)
+    const originX = 35;
 
     const projected = points.map((p) => {
       // Calculate radial extension or direct Z
@@ -138,7 +138,7 @@ export function JointPreviewOverlay() {
 
     // Draw link lines connecting joints
     ctx.strokeStyle = "rgba(184, 118, 63, 0.85)"; // Copper links
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -160,44 +160,44 @@ export function JointPreviewOverlay() {
         ? "rgb(36, 26, 18)"  // dark walnut base
         : "rgb(74, 52, 35)";  // walnut joint nodes
       ctx.beginPath();
-      ctx.arc(p.cx, p.cy, isTip ? 4 : 5, 0, 2 * Math.PI);
+      ctx.arc(p.cx, p.cy, isTip ? 3 : 4, 0, 2 * Math.PI);
       ctx.fill();
 
       // Outer rings for revolute joints
       if (!isBase && !isTip) {
         ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(p.cx, p.cy, 3.5, 0, 2 * Math.PI);
+        ctx.arc(p.cx, p.cy, 2.5, 0, 2 * Math.PI);
         ctx.stroke();
       }
 
-      // Draw annotation tags for key joints (J2, J3, J5, tip) to keep HUD clean
+      // Draw annotation tags for key joints (J2, J3, J5, tip) to keep HUD clean in small viewport
       const showLabel = p.name === "joint2" || p.name === "joint3" || p.name === "joint5" || p.name === "tip" || p.name === "joint1";
       if (showLabel) {
         ctx.fillStyle = "rgb(42, 29, 20)";
-        ctx.font = "bold 8.5px monospace";
+        ctx.font = "bold 7.2px monospace";
         let labelText = "";
         
         if (p.name === "tip") {
-          labelText = `Stylus Tip`;
+          labelText = `Tip`;
         } else {
           const jIdx = p.name.replace("joint", "J");
           const deg = (p.angle * 180) / Math.PI;
-          labelText = `${jIdx}:${deg > 0 ? "+" : ""}${deg.toFixed(0)}° ${p.axis}`;
+          labelText = `${jIdx}:${deg > 0 ? "+" : ""}${deg.toFixed(0)}°`;
         }
 
         // Offset label coordinates dynamically to prevent overlap
-        let ox = 8;
-        let oy = 3;
-        if (p.name === "joint3") { ox = -80; oy = -4; }
-        if (p.name === "joint1") { ox = 8; oy = -2; }
-        if (p.name === "tip") { ox = 8; oy = -2; }
+        let ox = 6;
+        let oy = 2;
+        if (p.name === "joint3") { ox = -38; oy = -4; }
+        if (p.name === "joint1") { ox = 6; oy = -1; }
+        if (p.name === "tip") { ox = 6; oy = -1; }
 
         ctx.fillStyle = "rgba(246, 244, 240, 0.9)";
-        ctx.fillRect(p.cx + ox - 2, p.cy + oy - 8, ctx.measureText(labelText).width + 4, 11);
-        ctx.strokeStyle = "rgba(169, 166, 156, 0.4)";
-        ctx.strokeRect(p.cx + ox - 2, p.cy + oy - 8, ctx.measureText(labelText).width + 4, 11);
+        ctx.fillRect(p.cx + ox - 2, p.cy + oy - 7, ctx.measureText(labelText).width + 4, 9);
+        ctx.strokeStyle = "rgba(169, 166, 156, 0.3)";
+        ctx.strokeRect(p.cx + ox - 2, p.cy + oy - 7, ctx.measureText(labelText).width + 4, 9);
 
         ctx.fillStyle = "rgb(42, 29, 20)";
         ctx.fillText(labelText, p.cx + ox, p.cy + oy);
@@ -208,55 +208,49 @@ export function JointPreviewOverlay() {
   if (!robot || jointNames.length === 0) return null;
 
   return (
-    <div className="absolute bottom-3 left-3 z-20 w-[300px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-3 shadow-lg font-mono text-[10px] text-[--walnut-900] select-none">
-      <div className="border-b border-[--steel-400]/30 pb-1.5 mb-2 flex items-center justify-between">
-        <span className="font-bold tracking-wider text-[--walnut-700] uppercase font-sans text-[9px]">
-          REAL-TIME TELEMETRY HUD
+    <div className="absolute bottom-3 left-3 z-20 w-[210px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-2.5 shadow-lg font-mono text-[9px] text-[--walnut-900] select-none">
+      <div className="border-b border-[--steel-400]/30 pb-1 mb-1.5 flex items-center justify-between">
+        <span className="font-bold tracking-wider text-[--walnut-700] uppercase font-sans text-[8px]">
+          TELEMETRY COMPASS
         </span>
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
       </div>
 
       {/* Dynamic 2D Kinematic Profile Preview */}
-      <div className="mb-3">
-        <p className="font-bold font-sans text-[9px] text-[--steel-600] uppercase tracking-wide mb-1.5">
-          Kinematic Profile View (Y-Z plane)
-        </p>
+      <div className="mb-2">
         <div className="bg-white border border-[--steel-200]/50 rounded overflow-hidden">
           <canvas
             ref={canvasRef}
-            width={274}
-            height={180}
-            className="block w-full h-[180px]"
+            width={184}
+            height={105}
+            className="block w-full h-[105px]"
           />
         </div>
       </div>
 
       {/* Cartesian Position */}
-      <div className="space-y-0.5 mb-2.5">
-        <p className="font-bold font-sans text-[9px] text-[--steel-600] uppercase tracking-wide mb-1">
-          End-Effector Tip (World)
-        </p>
-        <div className="grid grid-cols-3 gap-1 bg-[--steel-100]/60 p-1.5 rounded border border-[--steel-200]/40 text-center">
+      <div className="space-y-0.5 mb-2">
+        <div className="grid grid-cols-3 gap-1 bg-[--steel-100]/60 p-1 rounded border border-[--steel-200]/40 text-center">
           <div>
-            <span className="text-[9px] text-[--steel-600] block">X</span>
-            <span className="font-bold font-mono">{eePos.x.toFixed(3)}m</span>
+            <span className="text-[8px] text-[--steel-600] block">X</span>
+            <span className="font-bold font-mono">{eePos.x.toFixed(3)}</span>
           </div>
           <div>
-            <span className="text-[9px] text-[--steel-600] block">Y</span>
-            <span className="font-bold font-mono">{eePos.y.toFixed(3)}m</span>
+            <span className="text-[8px] text-[--steel-600] block">Y</span>
+            <span className="font-bold font-mono">{eePos.y.toFixed(3)}</span>
           </div>
           <div>
-            <span className="text-[9px] text-[--steel-600] block">Z</span>
-            <span className="font-bold font-mono">{eePos.z.toFixed(3)}m</span>
+            <span className="text-[8px] text-[--steel-600] block">Z</span>
+            <span className="font-bold font-mono">{eePos.z.toFixed(3)}</span>
           </div>
         </div>
       </div>
 
       {/* Safety Layer Indicator */}
-      <div className="border-t border-[--steel-400]/20 pt-2 flex items-center justify-between">
-        <span className="text-[9px] font-sans text-[--steel-600] uppercase font-bold">Motion Pipeline:</span>
-        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[9px] font-sans font-bold">
-          {lastIKReport?.success === false ? `BLOCKED (${lastIKReport?.reason || "error"})` : "ACTIVE / SAFE"}
+      <div className="border-t border-[--steel-400]/20 pt-1.5 flex items-center justify-between">
+        <span className="text-[8px] font-sans text-[--steel-600] uppercase font-bold">Safety:</span>
+        <span className="px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[8px] font-sans font-bold">
+          {lastIKReport?.success === false ? "BLOCKED" : "SAFE"}
         </span>
       </div>
     </div>
