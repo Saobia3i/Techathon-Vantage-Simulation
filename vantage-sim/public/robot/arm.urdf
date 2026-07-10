@@ -124,7 +124,7 @@
     <child link="link2"/>
     <origin xyz="0 0 0.14" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.5708" upper="1.5708" effort="100" velocity="1.0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.0"/>
   </joint>
 
   <!-- J3: Elbow pitch -->
@@ -133,7 +133,7 @@
     <child link="link3"/>
     <origin xyz="0 0 0.22" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.5708" upper="1.5708" effort="100" velocity="1.0"/>
+    <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.0"/>
   </joint>
 
   <!-- J4: Forearm roll -->
@@ -151,7 +151,7 @@
     <child link="link5"/>
     <origin xyz="0 0 0.15" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.5708" upper="1.5708" effort="50" velocity="1.5"/>
+    <limit lower="-3.14159" upper="3.14159" effort="50" velocity="1.5"/>
   </joint>
 
   <!-- J6: Wrist roll -->
