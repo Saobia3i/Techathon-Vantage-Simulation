@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { moveTo } from "../lib/moveTo";
+import { moveToSmooth as moveTo } from "../lib/animateArm";
 
 // একটি ইনিশিয়াল কারেন্ট পজিশন ধরে নিচ্ছি (প্যানেলের ১ নম্বর বোতামের কোঅর্ডিনেট)
 const INITIAL_POS = { x: 0.12, y: 0.04, z: 0.3 };

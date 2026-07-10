@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRobotStore } from "@/state/robotStore";
 import * as THREE from "three";
-import { moveTo } from "@/lib/moveTo";
+import { moveToSmooth as moveTo } from "@/lib/animateArm";
 
 const STEP = 0.02; // 2 cm — D-pad fallback step size
 

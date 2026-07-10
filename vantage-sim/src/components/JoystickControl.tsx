@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { moveTo } from "../lib/moveTo";
+import { moveToSmooth as moveTo } from "../lib/animateArm";
 
 const INITIAL_POS = { x: 0.12, y: 0.04, z: 0.3 };
 

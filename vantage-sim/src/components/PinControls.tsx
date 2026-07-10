@@ -1,7 +1,7 @@
 "use client";
 
 import { useRobotStore } from "@/state/robotStore";
-import { moveTo } from "@/lib/moveTo";
+import { moveToSmooth as moveTo } from "@/lib/animateArm";
 import { useState, useRef } from "react";
 
 const DIGIT_COLORS: Record<string, string> = {
