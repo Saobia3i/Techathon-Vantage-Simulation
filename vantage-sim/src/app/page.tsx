@@ -195,7 +195,7 @@ export default function Home() {
                 className="scene-grid-bg relative overflow-hidden"
                 style={{
                   width: "100%",
-                  height: "540px",
+                  height: "600px",
                   border: "1px solid var(--steel-200)",
                   borderRadius: "3px",
                 }}

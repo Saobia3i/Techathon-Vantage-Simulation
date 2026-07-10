@@ -119,10 +119,10 @@ export function JointPreviewOverlay() {
 
     // Projection mapping from 3D to 2D canvas:
     // We map side-profile: horizontal = Z extension (robot is rotated), vertical = Y height.
-    // Center the base at x = 45px, y = floorY
-    const scaleZ = 120; // px/m
-    const scaleY = 120; // px/m
-    const originX = 45;
+    // Center the base at x = 50px, y = floorY
+    const scaleZ = 165; // px/m (scaled up from 120)
+    const scaleY = 165; // px/m (scaled up from 120)
+    const originX = 50;
 
     const projected = points.map((p) => {
       // Calculate radial extension or direct Z
@@ -138,7 +138,7 @@ export function JointPreviewOverlay() {
 
     // Draw link lines connecting joints
     ctx.strokeStyle = "rgba(184, 118, 63, 0.85)"; // Copper links
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -160,15 +160,15 @@ export function JointPreviewOverlay() {
         ? "rgb(36, 26, 18)"  // dark walnut base
         : "rgb(74, 52, 35)";  // walnut joint nodes
       ctx.beginPath();
-      ctx.arc(p.cx, p.cy, isTip ? 3.5 : 4.5, 0, 2 * Math.PI);
+      ctx.arc(p.cx, p.cy, isTip ? 4 : 5, 0, 2 * Math.PI);
       ctx.fill();
 
       // Outer rings for revolute joints
       if (!isBase && !isTip) {
         ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(p.cx, p.cy, 3, 0, 2 * Math.PI);
+        ctx.arc(p.cx, p.cy, 3.5, 0, 2 * Math.PI);
         ctx.stroke();
       }
 
@@ -176,7 +176,7 @@ export function JointPreviewOverlay() {
       const showLabel = p.name === "joint2" || p.name === "joint3" || p.name === "joint5" || p.name === "tip" || p.name === "joint1";
       if (showLabel) {
         ctx.fillStyle = "rgb(42, 29, 20)";
-        ctx.font = "bold 7.5px monospace";
+        ctx.font = "bold 8.5px monospace";
         let labelText = "";
         
         if (p.name === "tip") {
@@ -190,14 +190,14 @@ export function JointPreviewOverlay() {
         // Offset label coordinates dynamically to prevent overlap
         let ox = 8;
         let oy = 3;
-        if (p.name === "joint3") { ox = -72; oy = -4; }
+        if (p.name === "joint3") { ox = -80; oy = -4; }
         if (p.name === "joint1") { ox = 8; oy = -2; }
         if (p.name === "tip") { ox = 8; oy = -2; }
 
-        ctx.fillStyle = "rgba(246, 244, 240, 0.85)";
-        ctx.fillRect(p.cx + ox - 2, p.cy + oy - 7, ctx.measureText(labelText).width + 4, 10);
-        ctx.strokeStyle = "rgba(169, 166, 156, 0.3)";
-        ctx.strokeRect(p.cx + ox - 2, p.cy + oy - 7, ctx.measureText(labelText).width + 4, 10);
+        ctx.fillStyle = "rgba(246, 244, 240, 0.9)";
+        ctx.fillRect(p.cx + ox - 2, p.cy + oy - 8, ctx.measureText(labelText).width + 4, 11);
+        ctx.strokeStyle = "rgba(169, 166, 156, 0.4)";
+        ctx.strokeRect(p.cx + ox - 2, p.cy + oy - 8, ctx.measureText(labelText).width + 4, 11);
 
         ctx.fillStyle = "rgb(42, 29, 20)";
         ctx.fillText(labelText, p.cx + ox, p.cy + oy);
@@ -208,7 +208,7 @@ export function JointPreviewOverlay() {
   if (!robot || jointNames.length === 0) return null;
 
   return (
-    <div className="absolute top-3 right-3 z-20 w-[250px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-3 shadow-lg font-mono text-[10px] text-[--walnut-900] select-none">
+    <div className="absolute top-3 right-3 z-20 w-[300px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-3 shadow-lg font-mono text-[10px] text-[--walnut-900] select-none">
       <div className="border-b border-[--steel-400]/30 pb-1.5 mb-2 flex items-center justify-between">
         <span className="font-bold tracking-wider text-[--walnut-700] uppercase font-sans text-[9px]">
           REAL-TIME TELEMETRY HUD
@@ -224,9 +224,9 @@ export function JointPreviewOverlay() {
         <div className="bg-white border border-[--steel-200]/50 rounded overflow-hidden">
           <canvas
             ref={canvasRef}
-            width={224}
-            height={130}
-            className="block w-full h-[130px]"
+            width={274}
+            height={180}
+            className="block w-full h-[180px]"
           />
         </div>
       </div>
