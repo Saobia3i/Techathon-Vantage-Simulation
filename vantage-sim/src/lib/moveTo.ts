@@ -4,7 +4,8 @@ import type { IKEquationReport, Vector3Like, IKResult } from "@/types/robot";
 
 const MAX_REACH = 1.0;
 const MIN_REACH = 0.05;
-const GROUND_MIN_Y = -0.02;
+const GROUND_MIN_Y = 0.0;
+const BOARD_MIN_Z = -0.045;
 const MAX_ITERATIONS = 250;
 const TOLERANCE = 0.005;
 const DAMPING = 0.03;
@@ -19,11 +20,39 @@ function finish(
   success: boolean,
   jointAngles: number[],
   reason?: string,
-): IKResult {
+  ): IKResult {
   report.success = success;
   report.reason = reason;
   useRobotStore.getState().setLastIKReport(report);
   return success ? { success, jointAngles, report } : { success, reason, jointAngles, report };
+}
+
+function checkCollision(robot: any, activeNames: string[], eeLink: any): { collision: boolean; reason?: string } {
+  // Check end-effector
+  const eePos = new THREE.Vector3();
+  eeLink.getWorldPosition(eePos);
+  if (eePos.y < GROUND_MIN_Y) {
+    return { collision: true, reason: "ground_collision" };
+  }
+  if (eePos.z < BOARD_MIN_Z) {
+    return { collision: true, reason: "board_collision" };
+  }
+
+  // Check all joint positions
+  for (const name of activeNames) {
+    const joint = robot.joints[name];
+    if (joint) {
+      const pos = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
+      if (pos.y < GROUND_MIN_Y) {
+        return { collision: true, reason: "ground_collision" };
+      }
+      if (pos.z < BOARD_MIN_Z) {
+        return { collision: true, reason: "board_collision" };
+      }
+    }
+  }
+
+  return { collision: false };
 }
 
 /**
@@ -123,6 +152,18 @@ export function moveTo(target: Vector3Like): IKResult {
 
   if (target.y < GROUND_MIN_Y) {
     console.warn(`[moveTo] Below ground: y=${target.y.toFixed(3)}`);
+    return finish(report, false, currentJointAngles(), "out_of_bounds");
+  }
+
+  report.steps.push({
+    label: "Board guard",
+    equation: `target.z >= ${BOARD_MIN_Z}`,
+    output: `${fmt(target.z)} >= ${BOARD_MIN_Z} is ${target.z >= BOARD_MIN_Z}`,
+    why: "The stylus is not allowed to target a point behind the board plane.",
+  });
+
+  if (target.z < BOARD_MIN_Z) {
+    console.warn(`[moveTo] Behind board: z=${target.z.toFixed(3)}`);
     return finish(report, false, currentJointAngles(), "out_of_bounds");
   }
 
@@ -301,6 +342,15 @@ export function moveTo(target: Vector3Like): IKResult {
           return finish(report, false, originalAngles, `${name}_out_of_limits`);
         }
       }
+    }
+
+    // Verify all joints and the end-effector do not collide with ground or board
+    const coll = checkCollision(robot, activeNames, eeLink);
+    if (coll.collision) {
+      console.warn(`[moveTo] Collision detected during movement verification: ${coll.reason}`);
+      jointNames.forEach((n, i) => robot.setJointValue(n, originalAngles[i]));
+      robot.updateMatrixWorld(true);
+      return finish(report, false, originalAngles, "out_of_bounds");
     }
 
     const finalAngles = currentJointAngles();
