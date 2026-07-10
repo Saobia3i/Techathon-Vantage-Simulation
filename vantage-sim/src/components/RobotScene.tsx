@@ -41,8 +41,8 @@ export function RobotScene() {
 
     // ── Scene ─────────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d0d14);
-    scene.fog = new THREE.FogExp2(0x0d0d14, 0.18);
+    scene.background = new THREE.Color(0xf1f5f9);
+    scene.fog = new THREE.FogExp2(0xf1f5f9, 0.15);
 
     // ── Camera ────────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(
@@ -63,17 +63,17 @@ export function RobotScene() {
     controls.update();
 
     // ── Lighting ──────────────────────────────────────────────────────────
-    const ambientLight = new THREE.AmbientLight(0x8899cc, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
     dirLight.position.set(2, 3, 2);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     scene.add(dirLight);
 
-    const rimLight = new THREE.DirectionalLight(0x4488ff, 0.4);
+    const rimLight = new THREE.DirectionalLight(0xe2e8f0, 0.2);
     rimLight.position.set(-2, 1, -2);
     scene.add(rimLight);
 
@@ -81,7 +81,7 @@ export function RobotScene() {
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(6, 6),
       new THREE.MeshStandardMaterial({
-        color: 0x111118,
+        color: 0xe2e8f0,
         roughness: 0.9,
         metalness: 0.1,
       })
@@ -91,7 +91,7 @@ export function RobotScene() {
     scene.add(ground);
 
     // Grid helper for spatial reference
-    const grid = new THREE.GridHelper(4, 20, 0x223355, 0x1a2233);
+    const grid = new THREE.GridHelper(4, 20, 0x94a3b8, 0xe2e8f0);
     grid.position.y = 0.001;
     scene.add(grid);
 
@@ -132,14 +132,14 @@ export function RobotScene() {
         // ── Render key panel (parented to robot root) ───────────────────
         renderKeyPanel(scene, robot);
       },
-      (progress: ProgressEvent) => {
-        if (progress.total > 0) {
+      (progress?: ProgressEvent) => {
+        if (progress && progress.total > 0) {
           console.log(
             `[RobotScene] Loading URDF: ${Math.round((progress.loaded / progress.total) * 100)}%`
           );
         }
       },
-      (err: ErrorEvent) => {
+      (err: any) => {
         console.error("[RobotScene] URDF load failed:", err);
       }
     );

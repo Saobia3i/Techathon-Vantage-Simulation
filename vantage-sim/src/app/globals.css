@@ -2,8 +2,8 @@
 
 /* ── Design tokens ────────────────────────────────────────────────── */
 :root {
-  --background:    #0d0d14;
-  --foreground:    #e8e8f0;
+  --background:    #f8fafc; /* Slate 50 */
+  --foreground:    #0f172a; /* Slate 900 */
   --font-sans:     var(--font-inter), system-ui, sans-serif;
   --font-mono:     "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 }
@@ -44,11 +44,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.08);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.16);
 }
 
 /* ── Selection ────────────────────────────────────────────────────── */

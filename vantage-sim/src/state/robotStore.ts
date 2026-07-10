@@ -55,7 +55,7 @@ export const useRobotStore = create<RobotState>((set) => ({
   linkNames: [],
   jointLimits: [],
   currentAngles: [],
-  stylusLinkName: "", // TODO: hardcode after URDF loads and you inspect console
+  stylusLinkName: "stylus_tip",
   keyPositions: {},
 
   setRobot: (r) => set({ robot: r }),
