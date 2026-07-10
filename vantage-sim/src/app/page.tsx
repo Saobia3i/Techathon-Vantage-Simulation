@@ -87,7 +87,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[--steel-100]">
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "28px 24px 64px" }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "28px 24px 64px" }}>
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <header

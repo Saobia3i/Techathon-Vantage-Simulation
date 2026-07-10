@@ -208,7 +208,7 @@ export function JointPreviewOverlay() {
   if (!robot || jointNames.length === 0) return null;
 
   return (
-    <div className="absolute top-3 right-3 z-20 w-[300px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-3 shadow-lg font-mono text-[10px] text-[--walnut-900] select-none">
+    <div className="absolute bottom-3 left-3 z-20 w-[300px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-3 shadow-lg font-mono text-[10px] text-[--walnut-900] select-none">
       <div className="border-b border-[--steel-400]/30 pb-1.5 mb-2 flex items-center justify-between">
         <span className="font-bold tracking-wider text-[--walnut-700] uppercase font-sans text-[9px]">
           REAL-TIME TELEMETRY HUD
