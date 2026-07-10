@@ -120,20 +120,34 @@ export function JoystickControls({ onStatusChange }: Props) {
     }
   }, [getEePos]);
 
+  // Sync slider UI when the arm moves via other inputs (WASD keys, voice, click panel)
+  const currentAngles = useRobotStore((s) => s.currentAngles);
+  useEffect(() => {
+    const ee = getEePos();
+    if (ee) {
+      setYValue(ee.y);
+    }
+  }, [currentAngles, getEePos]);
+
   const handleYChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newY = parseFloat(e.target.value);
     setYValue(newY);
-    doMove({ ...currentPos.current, y: newY });
+    const ee = getEePos();
+    if (ee) {
+      doMove({ x: ee.x, y: newY, z: ee.z });
+    }
   };
 
   // D-pad nudge fallback mapping to world coordinates
   const nudge = (axis: "x" | "y" | "z", dir: number) => {
-    const p = currentPos.current;
-    doMove({
-      x: p.x + (axis === "x" ? STEP * dir : 0),
-      y: p.y + (axis === "y" ? STEP * dir : 0),
-      z: p.z + (axis === "z" ? STEP * dir : 0),
-    });
+    const ee = getEePos();
+    if (ee) {
+      doMove({
+        x: ee.x + (axis === "x" ? STEP * dir : 0),
+        y: ee.y + (axis === "y" ? STEP * dir : 0),
+        z: ee.z + (axis === "z" ? STEP * dir : 0),
+      });
+    }
   };
 
   return (
