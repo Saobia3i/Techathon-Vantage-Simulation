@@ -8,6 +8,7 @@ import { cancelArmAnimation, moveToSmooth as moveTo } from "@/lib/animateArm";
 import { moveTo as validateMoveTo } from "@/lib/moveTo";
 import { chooseBestVoiceTranscript, describeVoiceCorrection, getSpeechAlternatives, normalizeVoiceText } from "@/lib/voiceGrammar";
 import { formatSafetyReason } from "@/lib/safetyMessages";
+import { getStylusTipWorldPosition } from "@/lib/stylusTip";
 
 type VoiceAction =
   | { type: "move_delta"; dx?: number; dy?: number; dz?: number }
@@ -51,11 +52,8 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function getEeWorldPosition() {
   const { robot, stylusLinkName } = useRobotStore.getState();
-  if (!robot || !stylusLinkName) return null;
-  const link = robot.links[stylusLinkName];
-  if (!link) return null;
-  robot.updateMatrixWorld(true);
-  const v = link.localToWorld(new THREE.Vector3(0, 0, 0.04));
+  const v = getStylusTipWorldPosition(robot, stylusLinkName);
+  if (!v) return null;
   return { x: v.x, y: v.y, z: v.z };
 }
 

@@ -5,17 +5,15 @@ import * as THREE from "three";
 import { moveToSmooth as moveTo } from "@/lib/animateArm";
 import { chooseBestVoiceTranscript, describeVoiceCorrection, getSpeechAlternatives, normalizeVoiceText } from "@/lib/voiceGrammar";
 import { formatSafetyReason } from "@/lib/safetyMessages";
+import { getStylusTipWorldPosition } from "@/lib/stylusTip";
 import { useRobotStore } from "@/state/robotStore";
 
 const STEP = 0.05;
 
 function getEeWorldPos(): { x: number; y: number; z: number } | null {
   const { robot, stylusLinkName } = useRobotStore.getState();
-  if (!robot) return null;
-  const link = robot.links[stylusLinkName];
-  if (!link) return null;
-  const v = new THREE.Vector3();
-  link.getWorldPosition(v);
+  const v = getStylusTipWorldPosition(robot, stylusLinkName);
+  if (!v) return null;
   return { x: v.x, y: v.y, z: v.z };
 }
 
@@ -37,6 +35,7 @@ export const useVoiceCommand = (onStatusChange?: VoiceStatusCallback) => {
   const [transcript, setTranscript] = useState("");
   const [lastAction, setLastAction] = useState("None");
   const recognitionRef = useRef<any>(null);
+  const unsupportedReportedRef = useRef(false);
 
   const processCommand = useCallback((command: string) => {
     const spoken = normalizeVoiceText(command);
@@ -103,7 +102,15 @@ export const useVoiceCommand = (onStatusChange?: VoiceStatusCallback) => {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      const msg = "Speech recognition is not supported in this browser. Try Chrome or Edge.";
+      setLastAction(msg);
+      if (!unsupportedReportedRef.current) {
+        unsupportedReportedRef.current = true;
+        onStatusChange?.(msg, false, "speech_recognition_unsupported");
+      }
+      return;
+    }
 
     recognitionRef.current = new SpeechRecognition();
     recognitionRef.current.continuous = false;
@@ -137,7 +144,12 @@ export const useVoiceCommand = (onStatusChange?: VoiceStatusCallback) => {
     }
 
     if (!recognitionRef.current) {
-      setLastAction("Speech recognition is not supported in this browser");
+      const msg = "Speech recognition is not supported in this browser. Try Chrome or Edge.";
+      setLastAction(msg);
+      if (!unsupportedReportedRef.current) {
+        unsupportedReportedRef.current = true;
+        onStatusChange?.(msg, false, "speech_recognition_unsupported");
+      }
     }
   };
 

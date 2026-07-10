@@ -1,9 +1,9 @@
 "use client";
 
 import { useRobotStore } from "@/state/robotStore";
-import * as THREE from "three";
 import { useState } from "react";
 import { moveToSmooth as moveTo } from "@/lib/animateArm";
+import { getStylusTipWorldPosition } from "@/lib/stylusTip";
 
 import { DebugControls } from "@/components/DebugControls";
 
@@ -37,12 +37,7 @@ export function Dashboard() {
 
   // End-effector world position — derived live from Three.js scene graph
   const endEffectorPos = (() => {
-    if (!robot || !stylusLinkName) return null;
-    const link = robot.links[stylusLinkName];
-    if (!link) return null;
-    const v = new THREE.Vector3();
-    link.getWorldPosition(v);
-    return v;
+    return getStylusTipWorldPosition(robot, stylusLinkName);
   })();
 
   const keyCount = Object.keys(keyPositions).length;

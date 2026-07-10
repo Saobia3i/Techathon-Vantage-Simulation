@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import * as THREE from "three";
 import { moveTo } from "../lib/moveTo";
+import { getStylusTipWorldPosition } from "../lib/stylusTip";
 import { useRobotStore } from "../state/robotStore";
 
 export const useKeyboardControls = () => {
@@ -22,12 +22,9 @@ export const useKeyboardControls = () => {
       // Robot load na hole command ignore korbe
       if (!robot) return;
 
-      const eeLink = robot.links[stylusLinkName];
-      if (!eeLink) return;
-
       // 3D scene theke ashol live position niye asha hocche
-      robot.updateMatrixWorld(true);
-      const pos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
+      const pos = getStylusTipWorldPosition(robot, stylusLinkName);
+      if (!pos) return;
 
       let { x, y, z } = currentTarget.current || {
         x: pos.x,

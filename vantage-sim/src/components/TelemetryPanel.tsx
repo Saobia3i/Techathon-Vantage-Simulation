@@ -3,6 +3,7 @@
 import { useRobotStore } from "@/state/robotStore";
 import * as THREE from "three";
 import { useEffect, useState } from "react";
+import { getStylusTipWorldPosition } from "@/lib/stylusTip";
 
 const RAD_TO_DEG = 180 / Math.PI;
 
@@ -16,10 +17,8 @@ export function TelemetryPanel() {
 
     function updateEe() {
       if (robot && stylusLinkName) {
-        const link = robot.links[stylusLinkName];
-        if (link) {
-          const world = new THREE.Vector3();
-          link.getWorldPosition(world);
+        const world = getStylusTipWorldPosition(robot, stylusLinkName);
+        if (world) {
           setEeWorldPosition(world.clone());
           setEeBasePosition(robot.worldToLocal(world.clone()));
         }

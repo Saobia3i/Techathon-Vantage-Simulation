@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { useRobotStore } from "@/state/robotStore";
 import type { IKEquationReport, Vector3Like, IKResult } from "@/types/robot";
+import { getStylusTipWorldPositionFromLink } from "@/lib/stylusTip";
 
 const MAX_REACH = 1.0;
 const MIN_REACH = 0.05;
@@ -41,7 +42,8 @@ export function checkCollision(robot: any, activeNames: string[], eeLink: any): 
   }
 
   // Add end-effector tip (actual physical tip lies at local Z=0.04m)
-  const eePos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
+  const eePos = getStylusTipWorldPositionFromLink(eeLink);
+  if (!eePos) return { collision: true, reason: "stylus_link_not_found" };
   points.push(eePos);
 
   // Sample points along the segment connecting adjacent joints/links to check
@@ -206,7 +208,10 @@ export function moveTo(target: Vector3Like): IKResult {
     iterationsUsed = iter + 1;
     robot.updateMatrixWorld(true);
 
-    const eePos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
+    const eePos = getStylusTipWorldPositionFromLink(eeLink);
+    if (!eePos) {
+      return finish(report, false, originalAngles, "stylus_link_not_found");
+    }
     finalEePos.copy(eePos);
 
     const error = new THREE.Vector3().subVectors(targetWorld, eePos);
@@ -295,7 +300,13 @@ export function moveTo(target: Vector3Like): IKResult {
 
   report.iterations = iterationsUsed;
   robot.updateMatrixWorld(true);
-  finalEePos.copy(eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04)));
+  const finalTipPos = getStylusTipWorldPositionFromLink(eeLink);
+  if (!finalTipPos) {
+    jointNames.forEach((n, i) => robot.setJointValue(n, originalAngles[i]));
+    robot.updateMatrixWorld(true);
+    return finish(report, false, originalAngles, "stylus_link_not_found");
+  }
+  finalEePos.copy(finalTipPos);
   const finalError = targetWorld.distanceTo(finalEePos);
   const finalConverged = converged || finalError < TOLERANCE;
   report.finalWorld = { x: finalEePos.x, y: finalEePos.y, z: finalEePos.z };

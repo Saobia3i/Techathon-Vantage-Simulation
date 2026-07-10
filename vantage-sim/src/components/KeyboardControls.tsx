@@ -2,11 +2,16 @@
 
 import { useRobotStore } from "@/state/robotStore";
 import { moveToSmooth as moveTo } from "@/lib/animateArm";
+import { formatSafetyReason } from "@/lib/safetyMessages";
+import { getStylusTipWorldPosition } from "@/lib/stylusTip";
 import * as THREE from "three";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const STEP_NORMAL = 0.02;  // 2 cm
 const STEP_FINE   = 0.005; // 5 mm — teammate's Shift fine-step
+
+const KEYBOARD_MOVE_MS = 95;
+const KEY_REPEAT_THROTTLE_MS = 85;
 
 const KEY_BINDINGS = [
   { key: "W", axis: "z" as const, dir: -1, label: "Forward (−Z)" },
@@ -22,34 +27,46 @@ export function KeyboardControls({
 }: {
   onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
 }) {
-  const { robot, stylusLinkName } = useRobotStore();
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
   const [focused, setFocused] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
+  const lastMoveAtRef = useRef(0);
 
   const getEePos = useCallback((): THREE.Vector3 | null => {
-    if (!robot || !stylusLinkName) return null;
-    const link = robot.links[stylusLinkName];
-    if (!link) return null;
-    const v = new THREE.Vector3();
-    link.getWorldPosition(v);
-    return v; // Return world position directly (since moveTo expects world coordinates)
-  }, [robot, stylusLinkName]);
+    const { robot, stylusLinkName } = useRobotStore.getState();
+    return getStylusTipWorldPosition(robot, stylusLinkName);
+  }, []);
 
   const handleNudge = useCallback(
     (axis: "x" | "y" | "z", dir: number, fine: boolean) => {
       const curPos = getEePos();
-      if (!curPos) return;
+      if (!curPos) {
+        const msg = "Keyboard blocked: robot or stylus tip is not loaded";
+        setIsSuccess(false);
+        setFeedback(msg);
+        onStatusChange?.(msg, false, "robot_not_loaded");
+        return;
+      }
+
       const step = fine ? STEP_FINE : STEP_NORMAL;
       const target = {
         x: curPos.x + (axis === "x" ? step * dir : 0),
         y: curPos.y + (axis === "y" ? step * dir : 0),
         z: curPos.z + (axis === "z" ? step * dir : 0),
       };
-      const res = moveTo(target);
+
+      if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
+        const msg = "Keyboard blocked: invalid target coordinate";
+        setIsSuccess(false);
+        setFeedback(msg);
+        onStatusChange?.(msg, false, "invalid_target");
+        return;
+      }
+
+      const res = moveTo(target, KEYBOARD_MOVE_MS);
       if (res.success) {
         setIsSuccess(true);
         const label = fine ? "fine" : "step";
@@ -58,7 +75,7 @@ export function KeyboardControls({
         onStatusChange?.(msg, true);
       } else {
         setIsSuccess(false);
-        const msg = `[${axis.toUpperCase()}] Failed: ${res.reason}`;
+        const msg = `[${axis.toUpperCase()}] blocked: ${formatSafetyReason(res.reason)}`;
         setFeedback(msg);
         onStatusChange?.(msg, false, res.reason);
       }
@@ -66,15 +83,51 @@ export function KeyboardControls({
     [getEePos, onStatusChange]
   );
 
+  const handleKeyCommand = useCallback(
+    (key: string, shiftKey: boolean, eventTarget: EventTarget | null) => {
+      if (key === "Shift") {
+        setShiftHeld(true);
+        return true;
+      }
+
+      const target = eventTarget as HTMLElement | null;
+      const tagName = target?.tagName;
+      if (
+        target?.isContentEditable ||
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        tagName === "SELECT"
+      ) {
+        return false;
+      }
+
+      const binding = KEY_BINDINGS.find((b) => b.key === key.toUpperCase());
+      if (!binding) return false;
+
+      const now = performance.now();
+      if (now - lastMoveAtRef.current < KEY_REPEAT_THROTTLE_MS) {
+        return true;
+      }
+      lastMoveAtRef.current = now;
+
+      setActiveKey(key.toUpperCase());
+      handleNudge(binding.axis, binding.dir, shiftKey);
+      return true;
+    },
+    [handleNudge],
+  );
+
   useEffect(() => {
-    if (!focused) return;
+    panelRef.current?.focus({ preventScroll: true });
+    setFocused(true);
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Shift") { setShiftHeld(true); return; }
-      const binding = KEY_BINDINGS.find((b) => b.key === e.key.toUpperCase());
-      if (!binding) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const handled = handleKeyCommand(e.key, e.shiftKey, e.target);
+      if (!handled) return;
       e.preventDefault();
-      setActiveKey(e.key.toUpperCase());
-      handleNudge(binding.axis, binding.dir, e.shiftKey);
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === "Shift") setShiftHeld(false);
@@ -86,7 +139,7 @@ export function KeyboardControls({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [focused, handleNudge]);
+  }, [handleKeyCommand]);
 
   return (
     <div className="space-y-4">
@@ -95,7 +148,7 @@ export function KeyboardControls({
           Keyboard control surface
         </p>
         <p className="text-[11px] text-[--steel-600] font-sans mb-3">
-          Click the activation zone, then use WASD + QE to drive the arm.{" "}
+          Use WASD + QE while this tab is open. Click the zone below only if you want the active indicator.{" "}
           <kbd className="px-1 py-0.5 rounded border border-[--steel-400] bg-white text-[10px] font-mono text-[--walnut-900]">⇧ Shift</kbd>{" "}
           <span className="text-[11px]">enables fine-step (5 mm).</span>
         </p>
@@ -107,6 +160,18 @@ export function KeyboardControls({
         tabIndex={0}
         onFocus={() => setFocused(true)}
         onBlur={() => { setFocused(false); setActiveKey(null); setShiftHeld(false); }}
+        onKeyDown={(event) => {
+          if (event.ctrlKey || event.metaKey || event.altKey) return;
+          const handled = handleKeyCommand(event.key, event.shiftKey, event.target);
+          if (!handled) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.nativeEvent.stopImmediatePropagation();
+        }}
+        onKeyUp={(event) => {
+          if (event.key === "Shift") setShiftHeld(false);
+          setActiveKey(null);
+        }}
         className={`relative flex items-center justify-center h-20 rounded border-2 cursor-pointer select-none outline-none transition-all ${
           focused
             ? shiftHeld
