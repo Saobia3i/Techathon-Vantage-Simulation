@@ -14,7 +14,6 @@ type Props = {
 export function JoystickControls({ onStatusChange }: Props) {
   const { robot, stylusLinkName } = useRobotStore();
   const joystickRef = useRef<HTMLDivElement>(null);
-  const currentPos = useRef({ x: 0.12, y: 0.28, z: 0.3 });
   const [yValue, setYValue] = useState(0.28); // world Y (height)
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(true);
@@ -32,7 +31,6 @@ export function JoystickControls({ onStatusChange }: Props) {
 
   const doMove = useCallback(
     (pos: { x: number; y: number; z: number }) => {
-      currentPos.current = pos;
       const res = moveTo(pos);
       if (res.success) {
         setIsSuccess(true);
@@ -48,12 +46,6 @@ export function JoystickControls({ onStatusChange }: Props) {
     },
     [onStatusChange]
   );
-
-  // Keep doMove reference fresh for the event listener without triggering useEffect re-runs
-  const doMoveRef = useRef(doMove);
-  useEffect(() => {
-    doMoveRef.current = doMove;
-  }, [doMove]);
 
   // nipple.js real joystick for X/Z world plane (screen X/Y)
   useEffect(() => {
@@ -140,7 +132,6 @@ export function JoystickControls({ onStatusChange }: Props) {
   useEffect(() => {
     const ee = getEePos();
     if (ee) {
-      currentPos.current = ee;
       setYValue(ee.y);
     }
   }, [getEePos]);
