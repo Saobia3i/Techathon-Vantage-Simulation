@@ -1,16 +1,24 @@
 @import "tailwindcss";
 
-/* ── Design tokens ────────────────────────────────────────────────── */
 :root {
-  --background:    #f8fafc; /* Slate 50 */
-  --foreground:    #0f172a; /* Slate 900 */
-  --font-sans:     Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono:     "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --bg-base: #121212;
+  --bg-panel: #1c1b19;
+  --border-subtle: #2a2825;
+  --steel: #c4c9d0;
+  --bronze: #8b5e3c;
+  --accent-glow: #d4a574;
+  --text-primary: #edeae4;
+  --text-secondary: #8a8680;
+  --status-green: #6ee7a8;
+  --status-blue: #7cb8e8;
+
+  --font-sans: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground:  var(--foreground);
+  --color-background: var(--bg-base);
+  --color-foreground:  var(--text-primary);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
@@ -22,8 +30,8 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-base);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -37,15 +45,32 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.16);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 /* ── Selection ────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(99, 102, 241, 0.35);
+  background: rgba(139, 94, 60, 0.35); /* Bronze tint */
   color: #fff;
 }
+
+/* ── Custom Animations ────────────────────────────────────────────── */
+@keyframes slideIn {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

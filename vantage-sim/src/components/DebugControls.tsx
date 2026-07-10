@@ -30,24 +30,25 @@ export function DebugControls() {
   if (jointNames.length === 0) return null;
 
   return (
-    <section className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">
-      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
+    <section className="rounded-lg bg-[--bg-panel] border border-[--border-subtle] p-4">
+      <h3 className="text-[11px] font-semibold font-sans uppercase tracking-widest text-[--text-secondary] border-b border-[--border-subtle] pb-2 mb-3">
         DEBUG — direct joint nudge
       </h3>
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {jointNames.map((name, i) => (
-          <div key={name} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-0">
-            <span className="font-mono text-slate-500 font-semibold">{name}</span>
-            <div className="flex gap-1.5">
+          <div key={name} className="flex items-center justify-between py-1.5 border-b border-[--border-subtle]/30 last:border-0">
+            <span className="text-xs font-mono text-[--text-secondary] w-20">{name}</span>
+            <div className="flex rounded-full border border-[--border-subtle] overflow-hidden bg-[--bg-base]">
               <button
                 onClick={() => nudgeJoint(i, -0.2)}
-                className="px-2.5 py-1 bg-white border border-slate-200 hover:border-slate-300 rounded-lg active:scale-90 transition-all font-bold cursor-pointer text-slate-700 w-8 text-center"
+                className="px-3 py-1 text-sm text-[--text-secondary] hover:bg-[--bronze] hover:text-[--text-primary] active:opacity-80 transition-colors w-8 text-center flex items-center justify-center font-bold cursor-pointer"
               >
-                -
+                −
               </button>
+              <div className="w-px bg-[--border-subtle]" />
               <button
                 onClick={() => nudgeJoint(i, 0.2)}
-                className="px-2.5 py-1 bg-white border border-slate-200 hover:border-slate-300 rounded-lg active:scale-90 transition-all font-bold cursor-pointer text-slate-700 w-8 text-center"
+                className="px-3 py-1 text-sm text-[--text-secondary] hover:bg-[--bronze] hover:text-[--text-primary] active:opacity-80 transition-colors w-8 text-center flex items-center justify-center font-bold cursor-pointer"
               >
                 +
               </button>

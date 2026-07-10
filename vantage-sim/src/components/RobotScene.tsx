@@ -17,10 +17,95 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { PMREMGenerator } from "three";
 import URDFLoader from "urdf-loader";
 import type { URDFRobot } from "urdf-loader";
 import { useRobotStore } from "@/state/robotStore";
 import { renderKeyPanel } from "@/components/renderKeyPanel";
+import { STEEL_MATERIAL, BRONZE_MATERIAL } from "@/lib/materials";
+
+function overrideMaterialsAndAddCollars(robot: URDFRobot) {
+  const jointCollarRadii: Record<string, number> = {
+    "joint1": 0.05,
+    "joint2": 0.045,
+    "joint3": 0.04,
+    "joint4": 0.035,
+    "joint5": 0.03,
+    "joint6": 0.025,
+  };
+
+  robot.traverse((child: any) => {
+    if (child.isMesh) {
+      if (child.name === "joint_collar") return;
+
+      let isJointVisual = false;
+      let parent = child.parent;
+      while (parent && parent !== robot) {
+        if (parent.isURDFJoint || parent.name.toLowerCase().includes("joint")) {
+          isJointVisual = true;
+          break;
+        }
+        parent = parent.parent;
+      }
+
+      if (isJointVisual) {
+        child.material = BRONZE_MATERIAL;
+      } else {
+        child.material = STEEL_MATERIAL;
+      }
+
+      // Smooth cylinder geometry segment count
+      if (child.geometry && child.geometry.type === "CylinderGeometry") {
+        const params = child.geometry.parameters;
+        child.geometry.dispose();
+        child.geometry = new THREE.CylinderGeometry(
+          params.radiusTop,
+          params.radiusBottom,
+          params.height,
+          32
+        );
+      }
+      
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  // Add joint collars at joint pivot points
+  const joints = (robot as any).joints;
+  if (joints) {
+    Object.entries(joints).forEach(([name, joint]: [string, any]) => {
+      if (joint.jointType === "revolute" || joint.jointType === "continuous") {
+        const radius = jointCollarRadii[name] ?? 0.03;
+        
+        // Remove existing collars if any (to avoid duplicates on hot reload)
+        const existing = joint.children.filter((c: any) => c.name === "joint_collar");
+        existing.forEach((c: any) => {
+          joint.remove(c);
+          if (c.geometry) c.geometry.dispose();
+        });
+
+        const collarMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius * 1.12, radius * 1.12, radius * 0.5, 32),
+          BRONZE_MATERIAL
+        );
+        collarMesh.name = "joint_collar";
+        if (joint.axis) {
+          const axis = joint.axis;
+          if (Math.abs(axis.z) > 0.9) {
+            collarMesh.rotation.x = Math.PI / 2;
+          } else if (Math.abs(axis.x) > 0.9) {
+            collarMesh.rotation.z = Math.PI / 2;
+          }
+        }
+        collarMesh.castShadow = true;
+        collarMesh.receiveShadow = true;
+        joint.add(collarMesh);
+      }
+    });
+  }
+}
 
 export function RobotScene() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,8 +127,12 @@ export function RobotScene() {
 
     // ── Scene ─────────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf1f5f9);
-    scene.fog = new THREE.FogExp2(0xf1f5f9, 0.15);
+    scene.background = new THREE.Color(0x121212);
+    scene.fog = new THREE.FogExp2(0x121212, 0.12);
+
+    // ── Environment Reflection (PBR) ──────────────────────────────────────
+    const pmremGenerator = new PMREMGenerator(renderer);
+    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
     // ── Camera ────────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(
@@ -63,36 +152,38 @@ export function RobotScene() {
     controls.maxDistance = 4;
     controls.update();
 
-    // ── Lighting ──────────────────────────────────────────────────────────
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
-    scene.add(ambientLight);
+    // ── Lighting (3-Point Setup) ──────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+    
+    const keyLight = new THREE.DirectionalLight(0xfff4e6, 1.1);
+    keyLight.position.set(3, 4, 2);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    
+    const fillLight = new THREE.DirectionalLight(0xe6f0ff, 0.4);
+    fillLight.position.set(-3, 2, -2);
+    
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    rimLight.position.set(0, 2, -4);
+    
+    scene.add(keyLight, fillLight, rimLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    dirLight.position.set(2, 3, 2);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    scene.add(dirLight);
-
-    const rimLight = new THREE.DirectionalLight(0xe2e8f0, 0.2);
-    rimLight.position.set(-2, 1, -2);
-    scene.add(rimLight);
-
-    // ── Ground plane ──────────────────────────────────────────────────────
+    // ── Reflective Ground plane ───────────────────────────────────────────
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(6, 6),
       new THREE.MeshStandardMaterial({
-        color: 0xe2e8f0,
-        roughness: 0.9,
-        metalness: 0.1,
+        color: 0x1a1a1a,
+        roughness: 0.25,
+        metalness: 0.8,
       })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Grid helper for spatial reference
-    const grid = new THREE.GridHelper(4, 20, 0x94a3b8, 0xe2e8f0);
+    // Grid helper for spatial reference (low opacity dark lines)
+    const grid = new THREE.GridHelper(4, 20, 0x2a2825, 0x1c1b19);
     grid.position.y = 0.001;
     scene.add(grid);
 
@@ -107,6 +198,9 @@ export function RobotScene() {
     loader.load(
       "/robot/arm.urdf",
       (robot: URDFRobot) => {
+        // Override visual materials and add joint collars for realistic look
+        overrideMaterialsAndAddCollars(robot);
+
         // URDF is Z-up; Three.js is Y-up — rotate to stand upright
         robot.rotation.x = -Math.PI / 2;
         robot.castShadow = true;
