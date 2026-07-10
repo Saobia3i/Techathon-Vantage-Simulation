@@ -130,9 +130,11 @@ export function RobotScene() {
         // Check 1: Mesh check
         console.log("Check 1: Mesh loading status");
         console.log("  - Loaded URDF Name:", robot.name);
-        const hasMeshes = (robot as any).collada || Object.values(robot.links).some((l: any) => 
-          l.visual && l.visual.some((v: any) => v.geometry && v.geometry.type === 'Mesh')
-        );
+        const hasMeshes = (robot as any).collada || Object.values(robot.links).some((l: any) => {
+          if (!l.visual) return false;
+          const visuals = Array.isArray(l.visual) ? l.visual : [l.visual];
+          return visuals.some((v: any) => v.geometry && v.geometry.type === 'Mesh');
+        });
         console.log("  - Does URDF contain external meshes?", hasMeshes ? "Yes" : "No (Using primitive shapes/cylinders)");
 
         // Check 2: Store Identity Check
