@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { SceneWrapper } from "@/components/SceneWrapper";
 import { TelemetryPanel } from "@/components/TelemetryPanel";
 import { DashboardControls } from "@/components/DashboardControls";
-import { JoystickControls } from "@/components/JoystickControls";
+import { JoystickControl } from "@/components/JoystickControl";
 import { KeyboardControls } from "@/components/KeyboardControls";
 import VoiceControlPanel from "@/components/VoiceControlPanel";
 import PinControls from "@/components/PinControls";
 import { JointPreviewOverlay } from "@/components/JointPreviewOverlay";
+import { formatSafetyReason } from "@/lib/safetyMessages";
 
 type SurfaceTab = "dashboard" | "joystick" | "keyboard" | "voice" | "pin";
 
@@ -79,9 +80,9 @@ export default function Home() {
     message: string;
   }>({ ok: true, message: "Safety validator: ready" });
 
-  const handleStatusChange = (msg: string, success: boolean, reason?: string) => {
-    setSafetyStatus({ ok: success, message: success ? `Safety validator: pass` : `Validator: ${reason || "failed"}` });
-  };
+  const handleStatusChange = useCallback((msg: string, success: boolean, reason?: string) => {
+    setSafetyStatus({ ok: success, message: success ? "Safety validator: pass" : formatSafetyReason(reason) });
+  }, []);
 
   const controlProps = { onStatusChange: handleStatusChange };
 
@@ -230,7 +231,7 @@ export default function Home() {
             </p>
 
             {activeTab === "dashboard" && <DashboardControls {...controlProps} />}
-            {activeTab === "joystick" && <JoystickControls {...controlProps} />}
+            {activeTab === "joystick" && <JoystickControl {...controlProps} />}
             {activeTab === "keyboard" && <KeyboardControls {...controlProps} />}
             {activeTab === "voice" && <VoiceControlPanel {...controlProps} />}
             {activeTab === "pin" && <PinControls {...controlProps} />}

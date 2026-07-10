@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { moveToSmooth as moveTo } from "@/lib/animateArm";
+import { chooseBestVoiceTranscript, describeVoiceCorrection, getSpeechAlternatives, normalizeVoiceText } from "@/lib/voiceGrammar";
+import { formatSafetyReason } from "@/lib/safetyMessages";
 import { useRobotStore } from "@/state/robotStore";
 
 const STEP = 0.05;
@@ -28,18 +30,21 @@ function rotateAroundWorldY(pos: { x: number; y: number; z: number }, degrees: n
   };
 }
 
-export const useVoiceCommand = () => {
+type VoiceStatusCallback = (msg: string, success: boolean, reason?: string) => void;
+
+export const useVoiceCommand = (onStatusChange?: VoiceStatusCallback) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [lastAction, setLastAction] = useState("None");
   const recognitionRef = useRef<any>(null);
 
   const processCommand = useCallback((command: string) => {
-    const spoken = command.toLowerCase().trim();
+    const spoken = normalizeVoiceText(command);
     const { keyPositions } = useRobotStore.getState();
     const cur = getEeWorldPos();
     if (!cur) {
       setLastAction("Robot not loaded");
+      onStatusChange?.("Robot not loaded", false, "robot_not_loaded");
       return;
     }
 
@@ -48,10 +53,13 @@ export const useVoiceCommand = () => {
       const target = keyPositions[keyMatch[1]];
       if (!target) {
         setLastAction(`Key ${keyMatch[1]} is not loaded`);
+        onStatusChange?.(`Key ${keyMatch[1]} is not loaded`, false, "key_not_loaded");
         return;
       }
       const result = moveTo(target);
-      setLastAction(result.success ? `Reached key ${keyMatch[1]}` : `Failed: ${result.reason}`);
+      const message = result.success ? `Reached key ${keyMatch[1]}` : formatSafetyReason(result.reason);
+      setLastAction(message);
+      onStatusChange?.(message, result.success, result.reason);
       return;
     }
 
@@ -60,11 +68,14 @@ export const useVoiceCommand = () => {
       const degrees = Number(rotateMatch[1]);
       if (!Number.isFinite(degrees) || Math.abs(degrees) > 90) {
         setLastAction("Rotation blocked: use -90 to 90 degrees");
+        onStatusChange?.("Rotation blocked: use -90 to 90 degrees", false, "out_of_bounds");
         return;
       }
       const target = rotateAroundWorldY(cur, degrees);
       const result = moveTo(target);
-      setLastAction(result.success ? `Rotated base path ${degrees} degrees` : `Failed: ${result.reason}`);
+      const message = result.success ? `Rotated base path ${degrees} degrees` : formatSafetyReason(result.reason);
+      setLastAction(message);
+      onStatusChange?.(message, result.success, result.reason);
       return;
     }
 
@@ -77,16 +88,17 @@ export const useVoiceCommand = () => {
     else if (spoken.includes("move backward") || spoken.includes("move back")) target.z += STEP;
     else {
       setLastAction("Command not recognized");
+      onStatusChange?.("Command not recognized", false, "command_not_recognized");
       return;
     }
 
     const result = moveTo(target);
-    setLastAction(
-      result.success
-        ? `Moved to (${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)})`
-        : `Failed: ${result.reason}`,
-    );
-  }, []);
+    const message = result.success
+      ? `Moved to (${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)})`
+      : formatSafetyReason(result.reason);
+    setLastAction(message);
+    onStatusChange?.(message, result.success, result.reason);
+  }, [onStatusChange]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -95,11 +107,15 @@ export const useVoiceCommand = () => {
 
     recognitionRef.current = new SpeechRecognition();
     recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.maxAlternatives = 5;
     recognitionRef.current.lang = "en-US";
 
     recognitionRef.current.onresult = (event: any) => {
-      const spokenText = event.results[0][0].transcript.toLowerCase().trim();
-      setTranscript(spokenText);
+      const alternatives = getSpeechAlternatives(event);
+      const spokenText = chooseBestVoiceTranscript(alternatives);
+      const rawText = alternatives[0]?.transcript ?? spokenText;
+      setTranscript(describeVoiceCorrection(rawText, spokenText));
       processCommand(spokenText);
     };
 

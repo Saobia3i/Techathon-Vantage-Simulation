@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { useRobotStore } from "@/state/robotStore";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { moveToSmooth as moveTo } from "@/lib/animateArm";
+import { chooseBestVoiceTranscript, describeVoiceCorrection, getSpeechAlternatives, normalizeVoiceText } from "@/lib/voiceGrammar";
+import { formatSafetyReason } from "@/lib/safetyMessages";
 
 type VoiceAction =
   | { type: "move_delta"; dx?: number; dy?: number; dz?: number }
@@ -58,7 +60,7 @@ function rotatePointAroundWorldY(pos: { x: number; y: number; z: number }, degre
 
 export default function VoiceControlPanel({ onStatusChange }: Props) {
   const { keyPositions } = useRobotStore();
-  const { isListening, transcript, lastAction, startListening } = useVoiceCommand();
+  const { isListening, transcript, lastAction, startListening } = useVoiceCommand(onStatusChange);
   const [agentInput, setAgentInput] = useState("");
   const [agentTranscript, setAgentTranscript] = useState("");
   const [agentStatus, setAgentStatus] = useState<{ ok: boolean; message: string } | null>(null);
@@ -101,11 +103,11 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
     const result = moveTo(target);
     return result.success
       ? { ok: true, message: `Moved to (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})` }
-      : { ok: false, message: `Blocked by safety validator: ${result.reason}`, reason: result.reason };
+      : { ok: false, message: formatSafetyReason(result.reason), reason: result.reason };
   };
 
   const runAgenticCommand = async (instruction: string) => {
-    const trimmed = instruction.trim();
+    const trimmed = normalizeVoiceText(instruction);
     if (!trimmed || agentBusy) return;
 
     setAgentBusy(true);
@@ -159,6 +161,8 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
     const recognition = new SpeechRecognition();
     agentRecognitionRef.current = recognition;
     recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 5;
     recognition.lang = "en-US";
 
     recognition.onstart = () => {
@@ -168,8 +172,10 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
     };
 
     recognition.onresult = (event: any) => {
-      const spokenText = event.results[0][0].transcript.toLowerCase().trim();
-      setAgentTranscript(spokenText);
+      const alternatives = getSpeechAlternatives(event);
+      const spokenText = chooseBestVoiceTranscript(alternatives);
+      const rawText = alternatives[0]?.transcript ?? spokenText;
+      setAgentTranscript(describeVoiceCorrection(rawText, spokenText));
       void runAgenticCommand(spokenText);
     };
 

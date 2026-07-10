@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeVoiceText } from "@/lib/voiceGrammar";
 
 type VoiceAction =
   | { type: "move_delta"; dx?: number; dy?: number; dz?: number }
@@ -25,7 +26,7 @@ function clampDelta(value: number) {
 
 function deltaFromDirection(direction: string, distance = DEFAULT_STEP): VoiceAction | null {
   const d = clampDelta(distance);
-  const dir = direction.toLowerCase();
+  const dir = normalizeVoiceText(direction);
   if (dir.includes("up")) return { type: "move_delta", dy: d };
   if (dir.includes("down")) return { type: "move_delta", dy: -d };
   if (dir.includes("left")) return { type: "move_delta", dx: -d };
@@ -36,7 +37,7 @@ function deltaFromDirection(direction: string, distance = DEFAULT_STEP): VoiceAc
 }
 
 function fallbackFromInstruction(instruction: string): AgenticVoiceResponse {
-  const text = instruction.toLowerCase();
+  const text = normalizeVoiceText(instruction);
   const actions: VoiceAction[] = [];
 
   const keyMatches = [...text.matchAll(/(?:key|button)\s*([1-6])/g)];
@@ -174,7 +175,7 @@ function parseJsonContent(content: unknown) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const instruction = String(body.instruction ?? "").trim();
+  const instruction = normalizeVoiceText(String(body.instruction ?? "").trim());
   if (!instruction) {
     return NextResponse.json({
       confirmation: "Please provide a voice or typed instruction.",
