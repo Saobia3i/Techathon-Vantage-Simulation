@@ -19,7 +19,7 @@ function finish(
   success: boolean,
   jointAngles: number[],
   reason?: string,
-  ): IKResult {
+): IKResult {
   report.success = success;
   report.reason = reason;
   useRobotStore.getState().setLastIKReport(report);
@@ -173,7 +173,7 @@ export function moveTo(target: Vector3Like): IKResult {
 
   if (target.y < minTargetY) {
     console.warn(`[moveTo] Target below safety boundary: y=${target.y.toFixed(3)} (insideBoard=${insideBoard})`);
-    return finish(report, false, currentJointAngles(), "out_of_bounds");
+    return finish(report, false, currentJointAngles(), insideBoard ? "board_collision" : "ground_collision");
   }
 
   const originalAngles = currentJointAngles();
@@ -354,11 +354,18 @@ export function moveTo(target: Vector3Like): IKResult {
 
     // Verify all joints and the end-effector do not collide with ground or board
     const coll = checkCollision(robot, activeNames, eeLink);
+    report.steps.push({
+      label: "Collision validation",
+      equation: "sampledLinkY >= minSurfaceY",
+      output: coll.collision ? `blocked: ${coll.reason}` : "clear",
+      why: "After IK converges, sampled points along the arm are checked against the ground and keypad board safety surfaces.",
+    });
+
     if (coll.collision) {
       console.warn(`[moveTo] Collision detected during movement verification: ${coll.reason}`);
       jointNames.forEach((n, i) => robot.setJointValue(n, originalAngles[i]));
       robot.updateMatrixWorld(true);
-      return finish(report, false, originalAngles, "out_of_bounds");
+      return finish(report, false, originalAngles, coll.reason || "collision_detected");
     }
 
     const finalAngles = currentJointAngles();
