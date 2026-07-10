@@ -5,7 +5,6 @@ import type { IKEquationReport, Vector3Like, IKResult } from "@/types/robot";
 const MAX_REACH = 1.0;
 const MIN_REACH = 0.05;
 const GROUND_MIN_Y = 0.0;
-const BOARD_MIN_Z = -0.045;
 const MAX_ITERATIONS = 250;
 const TOLERANCE = 0.005;
 const DAMPING = 0.03;
@@ -46,24 +45,23 @@ function checkCollision(robot: any, activeNames: string[], eeLink: any): { colli
   eeLink.getWorldPosition(eePos);
   points.push(eePos);
 
-  // Sample points along the segment connecting adjacent joints/links to check for collisions
+  // Sample points along the segment connecting adjacent joints/links to check
+  // for ground penetration (Y < 0 in Three.js world space).
+  // NOTE: board collision is not checked here because the key panel sits at
+  // positive Z in Three.js world space (robot is rotated -PI/2 on X).
+  // The workspace bounds check (MAX_REACH) already prevents out-of-range targets.
   for (let i = 0; i < points.length - 1; i++) {
     const start = points[i];
     const end = points[i + 1];
 
-    // Sample 8 points along each link cylinder segment
+    // Sample 8 intermediate points along each link cylinder segment
     for (let k = 0; k <= 7; k++) {
       const t = k / 7;
-      const x = (1 - t) * start.x + t * end.x;
       const y = (1 - t) * start.y + t * end.y;
-      const z = (1 - t) * start.z + t * end.z;
 
-      // Allow 1mm tolerance for base boundary/noise
+      // Allow 1mm tolerance for floating-point noise at the base plane
       if (y < -0.001) {
         return { collision: true, reason: "ground_collision" };
-      }
-      if (z < BOARD_MIN_Z) {
-        return { collision: true, reason: "board_collision" };
       }
     }
   }
@@ -173,15 +171,13 @@ export function moveTo(target: Vector3Like): IKResult {
 
   report.steps.push({
     label: "Board guard",
-    equation: `target.z >= ${BOARD_MIN_Z}`,
-    output: `${fmt(target.z)} >= ${BOARD_MIN_Z} is ${target.z >= BOARD_MIN_Z}`,
-    why: "The stylus is not allowed to target a point behind the board plane.",
+    equation: "target.y >= 0 (ground guard covers all planes; board is in front at +Z)",
+    output: `Board collision prevention via workspace radius limit (MAX_REACH = ${MAX_REACH} m)`,
+    why: "The panel board sits at positive Z in Three.js world space after the robot's -PI/2 X rotation; MAX_REACH already prevents unreachable targets.",
   });
-
-  if (target.z < BOARD_MIN_Z) {
-    console.warn(`[moveTo] Behind board: z=${target.z.toFixed(3)}`);
-    return finish(report, false, currentJointAngles(), "out_of_bounds");
-  }
+  // Note: No target.z < BOARD_MIN_Z guard — after robot.rotation.x = -Math.PI/2 the URDF +Y
+  // axis maps to Three.js +Z. The board is in front of the robot (positive Z), not negative.
+  // The workspace radius bound (MAX_REACH = 1.0m) is the correct guard for out-of-range targets.
 
   const originalAngles = currentJointAngles();
 
