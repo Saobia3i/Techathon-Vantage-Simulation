@@ -14,7 +14,7 @@
  * IMPORTANT: this component NEVER calls robot.joints[x].setJointValue().
  * Joint values are set exclusively through moveTo() — CONTEXT.md §2.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import URDFLoader from "urdf-loader";
@@ -24,6 +24,7 @@ import { renderKeyPanel } from "@/components/renderKeyPanel";
 
 export function RobotScene() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -197,7 +198,8 @@ export function RobotScene() {
         }
       },
       (err: any) => {
-        console.error("[RobotScene] URDF load failed:", err);
+        console.error("[URDF LOAD FAILED]", err);
+        setLoadError(err?.message || String(err) || "Unknown parsing or network error");
       }
     );
 
@@ -247,5 +249,25 @@ export function RobotScene() {
     };
   }, []);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  return (
+    <div className="relative w-full h-full">
+      <div ref={containerRef} className="w-full h-full" />
+      {loadError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-50/95 backdrop-blur-sm p-6 text-center border-2 border-red-200 rounded-xl z-50">
+          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-base font-bold text-red-800 mb-2">URDF Load Failed</h3>
+          <p className="text-xs text-red-600 font-mono bg-white border border-red-100 rounded px-3 py-1.5 max-w-lg overflow-x-auto whitespace-pre-wrap">
+            {loadError}
+          </p>
+          <p className="text-[10px] text-slate-500 mt-4 max-w-sm">
+            Please make sure that the real URDF and its meshes exist under public/robot/ and the file paths resolve correctly.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
