@@ -170,100 +170,105 @@ export function JoystickControls({ onStatusChange }: Props) {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 items-center bg-[--steel-100]/30 p-4 rounded border border-[--steel-200]/60">
-        {/* nipple.js joystick zone */}
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans text-center">X / Z plane</p>
-          <div
-            className="relative rounded-full border-2 border-[--steel-400] bg-[--steel-100] flex items-center justify-center shadow-inner"
-            style={{ width: 130, height: 130, flexShrink: 0 }}
-          >
-            {/*
-              This inner div is handed off entirely to nipplejs, which does its
-              own direct DOM manipulation (appendChild/removeChild) inside it.
-              React must never render conditional children into this same node —
-              doing so causes React's reconciler and nipplejs's manual DOM writes
-              to fight over the same child list, which surfaces as a
-              "Failed to execute 'removeChild'" crash. Keep this node's contents
-              100% owned by nipplejs.
-            */}
-            <div ref={joystickRef} className="w-full h-full" />
+      <div className="flex flex-col gap-2">
+        {/* Top Row: X/Z plane Joystick & Y Height Slider side-by-side */}
+        <div className="flex gap-2 items-center justify-between bg-[--steel-100]/30 p-3 rounded-t border border-[--steel-200]/60">
+          {/* nipple.js joystick zone */}
+          <div className="flex flex-col items-center gap-1.5 flex-1">
+            <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans text-center">X / Z plane</p>
+            <div
+              className="relative rounded-full border-2 border-[--steel-400] bg-[--steel-100] flex items-center justify-center shadow-inner"
+              style={{ width: 110, height: 110, flexShrink: 0 }}
+            >
+              {/*
+                This inner div is handed off entirely to nipplejs, which does its
+                own direct DOM manipulation (appendChild/removeChild) inside it.
+                React must never render conditional children into this same node —
+                doing so causes React's reconciler and nipplejs's manual DOM writes
+                to fight over the same child list, which surfaces as a
+                "Failed to execute 'removeChild'" crash. Keep this node's contents
+                100% owned by nipplejs.
+              */}
+              <div ref={joystickRef} className="w-full h-full" />
 
-            {/* Loading indicator lives as a SIBLING overlay, not a child of the
-                nipplejs zone, so React can freely mount/unmount it without ever
-                touching nodes nipplejs manages. */}
-            {!nippleReady && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-[10px] text-[--steel-400] font-sans">loading…</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Height Slider (Vertical Y in world space) */}
-        <div className="flex flex-col items-center gap-2 border-x border-[--steel-200]/50 px-2 h-full justify-center">
-          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans text-center">Y Height</p>
-          <div className="flex items-center gap-2.5 h-[130px] justify-center">
-            <input
-              type="range"
-              min="0.05"
-              max="0.85"
-              step="0.01"
-              value={yValue}
-              onChange={handleYChange}
-              className="cursor-pointer"
-              style={{
-                writingMode: "vertical-lr" as any,
-                direction: "rtl" as any,
-                height: 100,
-                width: 20,
-                accentColor: "var(--copper)",
-              }}
-            />
-            <span className="text-[10px] font-mono text-[--walnut-700] w-[45px] text-right font-bold">{yValue.toFixed(2)}m</span>
-          </div>
-        </div>
-
-        {/* D-pad fallback mapped to world coords */}
-        <div className="flex flex-col items-center gap-1.5 h-full justify-center">
-          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans text-center">D-Pad</p>
-          
-          <div className="flex flex-col items-center">
-            <button
-              onClick={() => nudge("z", -1)}
-              className="w-7 h-7 rounded-t border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
-              title="Move Forward (-Z)"
-            >▲</button>
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => nudge("x", -1)}
-                className="w-7 h-7 rounded-l border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
-                title="Move Left (-X)"
-              >◀</button>
-              <button
-                onClick={() => nudge("z", 1)}
-                className="w-7 h-7 border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
-                title="Move Backward (+Z)"
-              >▼</button>
-              <button
-                onClick={() => nudge("x", 1)}
-                className="w-7 h-7 rounded-r border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
-                title="Move Right (+X)"
-              >▶</button>
+              {/* Loading indicator lives as a SIBLING overlay, not a child of the
+                  nipplejs zone, so React can freely mount/unmount it without ever
+                  touching nodes nipplejs manages. */}
+              {!nippleReady && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="text-[9px] text-[--steel-400] font-sans">loading…</span>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Height Slider (Vertical Y in world space) */}
+          <div className="flex flex-col items-center gap-1.5 border-l border-[--steel-200]/50 pl-3 pr-1 flex-1 justify-center">
+            <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans text-center">Y Height</p>
+            <div className="flex items-center gap-2 h-[110px] justify-center">
+              <input
+                type="range"
+                min="0.05"
+                max="0.85"
+                step="0.01"
+                value={yValue}
+                onChange={handleYChange}
+                className="cursor-pointer"
+                style={{
+                  writingMode: "vertical-lr" as any,
+                  direction: "rtl" as any,
+                  height: 90,
+                  width: 18,
+                  accentColor: "var(--copper)",
+                }}
+              />
+              <span className="text-[10px] font-mono text-[--walnut-700] w-[40px] text-right font-bold">{yValue.toFixed(2)}m</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Row: D-pad fallback mapped to world coords, stacked underneath */}
+        <div className="flex flex-col items-center gap-1.5 bg-[--steel-100]/30 p-3 rounded-b border-x border-b border-[--steel-200]/60 border-t-0 justify-center">
+          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans text-center">D-Pad Step Nudges</p>
           
-          <div className="flex gap-1.5 mt-1 border-t border-[--steel-200]/40 pt-1.5 w-full justify-center">
-            <button
-              onClick={() => nudge("y", 1)}
-              className="w-9 h-6 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-[9px] font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
-              title="Move Up (+Y)"
-            >+Y</button>
-            <button
-              onClick={() => nudge("y", -1)}
-              className="w-9 h-6 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-[9px] font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
-              title="Move Down (-Y)"
-            >-Y</button>
+          <div className="flex gap-4 items-center">
+            <div className="flex flex-col items-center">
+              <button
+                onClick={() => nudge("z", -1)}
+                className="w-7 h-7 rounded-t border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
+                title="Move Forward (-Z)"
+              >▲</button>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => nudge("x", -1)}
+                  className="w-7 h-7 rounded-l border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
+                  title="Move Left (-X)"
+                >◀</button>
+                <button
+                  onClick={() => nudge("z", 1)}
+                  className="w-7 h-7 border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
+                  title="Move Backward (+Z)"
+                >▼</button>
+                <button
+                  onClick={() => nudge("x", 1)}
+                  className="w-7 h-7 rounded-r border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
+                  title="Move Right (+X)"
+                >▶</button>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-1.5 border-l border-[--steel-200]/40 pl-4">
+              <button
+                onClick={() => nudge("y", 1)}
+                className="w-9 h-6 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-[9px] font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
+                title="Move Up (+Y)"
+              >+Y</button>
+              <button
+                onClick={() => nudge("y", -1)}
+                className="w-9 h-6 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-[9px] font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center shadow-sm"
+                title="Move Down (-Y)"
+              >-Y</button>
+            </div>
           </div>
         </div>
       </div>
