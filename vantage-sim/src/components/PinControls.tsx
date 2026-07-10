@@ -146,6 +146,24 @@ export function PinControls({
         ))}
       </div>
 
+      {/* Presets */}
+      {!running && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setPin(["1", "2", "3", "4", "5", "6"]); setSequence([]); }}
+            className="flex-1 py-1.5 rounded border border-[--steel-400] bg-[--panel] text-[--walnut-700] text-[10px] font-bold font-sans hover:bg-[--steel-200] cursor-pointer text-center"
+          >
+            Load 1-2-3-4-5-6
+          </button>
+          <button
+            onClick={() => { setPin(["6", "5", "4", "3", "2", "1"]); setSequence([]); }}
+            className="flex-1 py-1.5 rounded border border-[--steel-400] bg-[--panel] text-[--walnut-700] text-[10px] font-bold font-sans hover:bg-[--steel-200] cursor-pointer text-center"
+          >
+            Load 6-5-4-3-2-1
+          </button>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex gap-2">
         <button
