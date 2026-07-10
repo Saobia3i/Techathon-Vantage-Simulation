@@ -87,7 +87,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[--steel-100]">
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "28px 24px 64px" }}>
+      <div style={{ maxWidth: "1320px", margin: "0 auto", padding: "28px 24px 64px" }}>
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <header
@@ -166,7 +166,7 @@ export default function Home() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 360px",
+            gridTemplateColumns: "1fr 300px",
             gap: "20px",
             alignItems: "start",
           }}
@@ -195,7 +195,7 @@ export default function Home() {
                 className="scene-grid-bg relative overflow-hidden"
                 style={{
                   width: "100%",
-                  height: "540px",
+                  height: "460px",
                   border: "1px solid var(--steel-200)",
                   borderRadius: "3px",
                 }}
