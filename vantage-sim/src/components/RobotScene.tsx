@@ -157,6 +157,8 @@ export function RobotScene() {
       // Joint values are never SET here; that goes through moveTo().
       const robot = useRobotStore.getState().robot;
       if (robot) {
+        // Ensure coordinate matrices are updated before reading positions/angles
+        robot.updateMatrixWorld(true);
         const angles = Object.values(robot.joints).map(
           (j) => (j.angle as number) ?? 0
         );

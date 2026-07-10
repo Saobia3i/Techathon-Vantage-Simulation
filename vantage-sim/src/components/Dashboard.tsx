@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { useState } from "react";
 import { moveTo } from "@/lib/moveTo";
 
+import { DebugControls } from "@/components/DebugControls";
+
 const RAD_TO_DEG = 180 / Math.PI;
 
 const KEY_COLORS_MAP: Record<string, string> = {
@@ -122,6 +124,9 @@ export function Dashboard() {
           </table>
         )}
       </section>
+
+      {/* ── Debug Nudge Panel ────────────────────────────────────────── */}
+      <DebugControls />
 
       {/* ── End-Effector Position ───────────────────────────────────── */}
       <section className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">

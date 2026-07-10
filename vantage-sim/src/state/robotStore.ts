@@ -66,3 +66,7 @@ export const useRobotStore = create<RobotState>((set) => ({
   setStylusLinkName: (name) => set({ stylusLinkName: name }),
   setKeyPositions: (positions) => set({ keyPositions: positions }),
 }));
+
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  (window as any).useRobotStore = useRobotStore;
+}

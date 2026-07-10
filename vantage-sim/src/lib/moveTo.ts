@@ -17,3 +17,7 @@ export function moveTo(_target: Vector3Like): IKResult {
     jointAngles: [0, 0, 0, 0, 0, 0],
   };
 }
+
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  (window as any).moveTo = moveTo;
+}
