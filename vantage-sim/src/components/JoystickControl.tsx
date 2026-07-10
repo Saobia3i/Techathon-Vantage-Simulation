@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as THREE from "three";
 import { moveToSmooth as moveTo } from "@/lib/animateArm";
 import { formatSafetyReason } from "@/lib/safetyMessages";
+import { getStylusTipWorldPosition } from "@/lib/stylusTip";
 import { useRobotStore } from "@/state/robotStore";
 
 type Props = {
@@ -12,7 +12,6 @@ type Props = {
 
 type WorldPos = { x: number; y: number; z: number };
 
-const TIP_OFFSET_LOCAL_Z = 0.04;
 const JOYSTICK_SIZE = 112;
 const STICK_SIZE = 34;
 const MAX_DRAG_STEP = 0.022;
@@ -24,13 +23,8 @@ const MAX_Y = 0.85;
 
 function readEndEffectorTip(): WorldPos | null {
   const { robot, stylusLinkName } = useRobotStore.getState();
-  if (!robot) return null;
-
-  const link = robot.links[stylusLinkName || "stylus_tip"];
-  if (!link) return null;
-
-  robot.updateMatrixWorld(true);
-  const tip = link.localToWorld(new THREE.Vector3(0, 0, TIP_OFFSET_LOCAL_Z));
+  const tip = getStylusTipWorldPosition(robot, stylusLinkName);
+  if (!tip) return null;
   return { x: tip.x, y: tip.y, z: tip.z };
 }
 

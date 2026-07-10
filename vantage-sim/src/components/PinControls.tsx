@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { moveToSmooth as moveTo } from "../lib/animateArm";
+import { cancelArmAnimation, moveToSmooth as moveTo } from "../lib/animateArm";
+import { moveTo as validateMoveTo } from "../lib/moveTo";
 import { formatSafetyReason } from "@/lib/safetyMessages";
 import { useRobotStore } from "../state/robotStore";
 
@@ -20,12 +21,31 @@ type StepState = {
   message: string;
 };
 
+type MotionTarget = { x: number; y: number; z: number };
+
+type PinMotionStep = {
+  index: number;
+  digit: string;
+  phase: "approach" | "touch" | "retract";
+  target: MotionTarget;
+};
+
 const PIN_LENGTH = 6;
 const APPROACH_LIFT_METERS = 0.055;
 const DWELL_MS = 450;
 const TRAVEL_MS = 680;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function restoreRobotPose(angles: number[]) {
+  const { robot, jointNames } = useRobotStore.getState();
+  if (!robot) return;
+  jointNames.forEach((name, index) => {
+    robot.setJointValue(name, angles[index] ?? 0);
+  });
+  robot.updateMatrixWorld(true);
+  useRobotStore.getState().setCurrentAngles(angles);
+}
 
 function validatePinInput(raw: string, availableKeys: string[]): PinValidation {
   const normalized = raw.replace(/[\s,-]/g, "");
@@ -105,6 +125,51 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
     onStatusChange?.(msg, success, reason);
   };
 
+  const buildMotionPlan = (sequence: string[]): PinMotionStep[] => {
+    return sequence.flatMap((digit, index) => {
+      const target = keyPositions[digit];
+      const approach = { x: target.x, y: target.y + APPROACH_LIFT_METERS, z: target.z };
+      return [
+        { index, digit, phase: "approach" as const, target: approach },
+        { index, digit, phase: "touch" as const, target },
+        { index, digit, phase: "retract" as const, target: approach },
+      ];
+    });
+  };
+
+  const preflightMotionPlan = (
+    plan: PinMotionStep[],
+  ): { ok: true } | { ok: false; step: PinMotionStep; reason?: string; message: string } => {
+    const { robot, jointNames } = useRobotStore.getState();
+    if (!robot || jointNames.length === 0) {
+      return {
+        ok: false,
+        step: plan[0],
+        reason: "robot_not_loaded",
+        message: "PIN rejected before motion: robot is not loaded.",
+      };
+    }
+
+    cancelArmAnimation();
+    const originalAngles = jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0);
+
+    for (const step of plan) {
+      const result = validateMoveTo(step.target);
+      if (!result.success) {
+        restoreRobotPose(originalAngles);
+        return {
+          ok: false,
+          step,
+          reason: result.reason,
+          message: `PIN rejected before motion at key ${step.digit} ${step.phase}: ${formatSafetyReason(result.reason)}`,
+        };
+      }
+    }
+
+    restoreRobotPose(originalAngles);
+    return { ok: true };
+  };
+
   const executePin = async () => {
     if (isExecuting) return;
 
@@ -113,7 +178,7 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
       return;
     }
 
-    setIsExecuting(true);
+    const motionPlan = buildMotionPlan(validation.sequence);
     setSteps(
       validation.sequence.map((digit, index) => ({
         index,
@@ -122,6 +187,16 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
         message: "Waiting",
       })),
     );
+
+    report(`Preflight validating PIN: ${validation.sequence.join(" -> ")}`, true);
+    const preflight = preflightMotionPlan(motionPlan);
+    if (!preflight.ok) {
+      setStepStatus(preflight.step.index, "failed", preflight.message);
+      report(preflight.message, false, preflight.reason);
+      return;
+    }
+
+    setIsExecuting(true);
     report(`Starting validated PIN: ${validation.sequence.join(" -> ")}`, true);
 
     for (let index = 0; index < validation.sequence.length; index++) {

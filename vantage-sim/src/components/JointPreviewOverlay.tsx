@@ -3,6 +3,7 @@
 import { useRobotStore } from "@/state/robotStore";
 import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
+import { getStylusTipWorldPosition } from "@/lib/stylusTip";
 
 export function JointPreviewOverlay() {
   const { robot, jointNames, currentAngles, lastIKReport } = useRobotStore();
@@ -20,7 +21,8 @@ export function JointPreviewOverlay() {
     let rafId: number;
     const update = () => {
       robot.updateMatrixWorld(true);
-      const v = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
+      const v = getStylusTipWorldPosition(robot, name);
+      if (!v) return;
       setEePos({ x: v.x, y: v.y, z: v.z });
 
       // Draw the schematic on the canvas
@@ -103,10 +105,8 @@ export function JointPreviewOverlay() {
     });
 
     // Add stylus tip position
-    const tipPos = new THREE.Vector3();
-    const eeLink = robot.links[stylusName];
-    if (eeLink) {
-      eeLink.localToWorld(tipPos.set(0, 0, 0.04));
+    const tipPos = getStylusTipWorldPosition(robot, stylusName);
+    if (tipPos) {
       points.push({
         x: tipPos.x,
         y: tipPos.y,
