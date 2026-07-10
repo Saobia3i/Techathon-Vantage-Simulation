@@ -28,25 +28,41 @@ function finish(
 }
 
 function checkCollision(robot: any, activeNames: string[], eeLink: any): { collision: boolean; reason?: string } {
-  // Check end-effector
-  const eePos = new THREE.Vector3();
-  eeLink.getWorldPosition(eePos);
-  if (eePos.y < GROUND_MIN_Y) {
-    return { collision: true, reason: "ground_collision" };
-  }
-  if (eePos.z < BOARD_MIN_Z) {
-    return { collision: true, reason: "board_collision" };
-  }
+  const points: THREE.Vector3[] = [];
 
-  // Check all joint positions
-  for (const name of activeNames) {
+  // Add all joints from joint1 to joint6 in kinematic order
+  const chain = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"];
+  for (const name of chain) {
     const joint = robot.joints[name];
     if (joint) {
-      const pos = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
-      if (pos.y < GROUND_MIN_Y) {
+      const pos = new THREE.Vector3();
+      joint.getWorldPosition(pos);
+      points.push(pos);
+    }
+  }
+
+  // Add end-effector tip
+  const eePos = new THREE.Vector3();
+  eeLink.getWorldPosition(eePos);
+  points.push(eePos);
+
+  // Sample points along the segment connecting adjacent joints/links to check for collisions
+  for (let i = 0; i < points.length - 1; i++) {
+    const start = points[i];
+    const end = points[i + 1];
+
+    // Sample 8 points along each link cylinder segment
+    for (let k = 0; k <= 7; k++) {
+      const t = k / 7;
+      const x = (1 - t) * start.x + t * end.x;
+      const y = (1 - t) * start.y + t * end.y;
+      const z = (1 - t) * start.z + t * end.z;
+
+      // Allow 1mm tolerance for base boundary/noise
+      if (y < -0.001) {
         return { collision: true, reason: "ground_collision" };
       }
-      if (pos.z < BOARD_MIN_Z) {
+      if (z < BOARD_MIN_Z) {
         return { collision: true, reason: "board_collision" };
       }
     }
