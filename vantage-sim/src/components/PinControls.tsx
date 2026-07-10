@@ -4,12 +4,24 @@ import { useState } from "react";
 import { moveTo } from "../lib/moveTo";
 import { useRobotStore } from "../state/robotStore";
 
+// TypeScript-এর জন্য Props ডিফাইন করা হলো (যাতে page.tsx থেকে আসা ডেটা রিসিভ করতে পারে)
+interface PinControlsProps {
+  onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
+}
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export default function PinControls() {
+export default function PinControls({ onStatusChange }: PinControlsProps) {
   const [pin, setPin] = useState("123456");
   const [isExecuting, setIsExecuting] = useState(false);
   const [status, setStatus] = useState("Ready for input");
+
+  const updateStatus = (msg: string) => {
+    setStatus(msg);
+    if (onStatusChange) {
+      onStatusChange(msg, true);
+    }
+  };
 
   const executePin = async () => {
     if (!pin || isExecuting) return;
@@ -17,12 +29,14 @@ export default function PinControls() {
     const keyPositions = useRobotStore.getState().keyPositions;
 
     if (Object.keys(keyPositions).length === 0) {
-      setStatus("Error: Key positions not loaded yet!");
+      const errorMsg = "Error: Key positions not loaded yet!";
+      setStatus(errorMsg);
+      if (onStatusChange) onStatusChange(errorMsg, false, "No positions");
       return;
     }
 
     setIsExecuting(true);
-    setStatus("Starting autonomous sequence...");
+    updateStatus("Starting autonomous sequence...");
 
     for (let i = 0; i < pin.length; i++) {
       const digit = pin[i];
@@ -33,28 +47,21 @@ export default function PinControls() {
         continue;
       }
 
-      setStatus(`Targeting digit: ${digit}`);
-
-      // FIX: ডিরেকশন উল্টে দেওয়া হলো (-0.05)।
-      // এখন রোবট ঠিকভাবে বাটনের সামনে ভাসবে, ভেতরের দিকে ঢুকে যাবে না!
+      updateStatus(`Targeting digit: ${digit}`);
       const hoverZ = targetPos.z - 0.05;
 
-      // Step 1: Hover (বাটনের ঠিক সামনে আসবে)
       moveTo({ x: targetPos.x, y: targetPos.y, z: hoverZ });
       await delay(600);
 
-      // Step 2: Press (সামনে এগিয়ে বাটন প্রেস করবে)
-      setStatus(`Pressing digit: ${digit}`);
+      updateStatus(`Pressing digit: ${digit}`);
       moveTo({ x: targetPos.x, y: targetPos.y, z: targetPos.z });
       await delay(400);
 
-      // Step 3: Hover back (প্রেস করে আবার পেছনে সরে আসবে)
       moveTo({ x: targetPos.x, y: targetPos.y, z: hoverZ });
       await delay(500);
     }
 
-    setStatus("Sequence complete! Returning to home.");
-    // কাজ শেষে নিরাপদ পজিশনে ফিরে আসবে
+    updateStatus("Sequence complete! Returning to home.");
     moveTo({ x: 0.12, y: 0.25, z: 0.15 });
 
     setIsExecuting(false);
