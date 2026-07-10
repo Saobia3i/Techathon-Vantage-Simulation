@@ -101,13 +101,29 @@ export function JoystickControls({ onStatusChange }: Props) {
         const ratio = Math.min(data.distance / JOYSTICK_RADIUS, 1.0);
         const speed = ratio * MAX_SPEED;
 
-        // Map 2D joystick polar angle to Three.js world X/Z:
-        //   nipplejs angle 0 = right (+X), 90 = up (-Z in Three.js)
-        doMoveRef.current({
+        // Call raw moveTo directly to bypass React state overhead during drag
+        moveTo({
           x: v.x + Math.cos(angle) * speed,
-          y: v.y,           // Y height controlled by slider
+          y: v.y,
           z: v.z - Math.sin(angle) * speed,
         });
+      });
+
+      // Update feedback only once when user stops dragging
+      manager.on("end", () => {
+        const store = useRobotStore.getState();
+        const robot = store.robot;
+        const name = store.stylusLinkName || "stylus_tip";
+        if (!robot) return;
+        const eeLink = robot.links[name];
+        if (!eeLink) return;
+        robot.updateMatrixWorld(true);
+        const v = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
+        
+        const msg = `Joystick → (${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`;
+        setFeedback(msg);
+        setIsSuccess(true);
+        onStatusChange?.(msg, true);
       });
     });
 
