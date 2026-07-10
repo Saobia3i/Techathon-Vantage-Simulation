@@ -77,14 +77,14 @@ export async function renderKeyPanel(
     console.warn("[renderKeyPanel] Using built-in key layout because key.config.json failed:", err);
   }
 
-  const existingPanel = robot.getObjectByName("key_panel");
+  const existingPanel = scene.getObjectByName("key_panel");
   if (existingPanel) {
-    robot.remove(existingPanel);
+    scene.remove(existingPanel);
   }
 
   const panelGroup = new THREE.Group();
   panelGroup.name = "key_panel";
-  robot.add(panelGroup);
+  scene.add(panelGroup);
 
   const entries = Object.entries(keyConfig).sort(([a], [b]) => Number(a) - Number(b));
   const xs = entries.map(([, pos]) => pos.x);
@@ -95,11 +95,15 @@ export async function renderKeyPanel(
   const minZ = Math.min(...zs);
   const maxZ = Math.max(...zs);
   const centerX = (minX + maxX) / 2;
-  const centerY = ys.reduce((sum, y) => sum + y, 0) / ys.length;
+  const centerY = ys.reduce((sum, y) => sum + y, 0) / ys.length; // usually 0.04 (top of keys)
   const centerZ = (minZ + maxZ) / 2;
   const panelWidth = maxX - minX + PANEL_MARGIN * 2;
   const panelHeight = maxZ - minZ + PANEL_MARGIN * 2;
 
+  // The backplate sits directly on the floor.
+  // Top of keys is at centerY (0.04), key thickness is KEY_DEPTH (0.012).
+  // So backplate top face should be at centerY - KEY_DEPTH (0.028).
+  const backplateY = centerY - KEY_DEPTH - PANEL_THICKNESS / 2;
   const panel = new THREE.Mesh(
     new THREE.BoxGeometry(panelWidth, PANEL_THICKNESS, panelHeight),
     new THREE.MeshStandardMaterial({
@@ -109,7 +113,7 @@ export async function renderKeyPanel(
     }),
   );
   panel.name = "key_panel_backplate";
-  panel.position.set(centerX, centerY + PANEL_THICKNESS / 2, centerZ);
+  panel.position.set(centerX, backplateY, centerZ);
   panel.castShadow = true;
   panel.receiveShadow = true;
   panelGroup.add(panel);
@@ -129,6 +133,7 @@ export async function renderKeyPanel(
     );
     key.name = `key_${digit}`;
     key.userData.digit = digit;
+    // Position key center so the top face is at centerY (0.04)
     key.position.set(pos.x, centerY - KEY_DEPTH / 2, pos.z);
     key.castShadow = true;
     key.receiveShadow = true;
@@ -136,15 +141,18 @@ export async function renderKeyPanel(
 
     const label = makeDigitLabel(digit);
     if (label) {
-      label.position.set(pos.x, centerY - KEY_DEPTH - 0.001, pos.z);
+      // Place label flat on top of the key face (Y = centerY + eps)
+      label.position.set(pos.x, centerY + 0.0005, pos.z);
+      // Rotate label to lay flat on the floor (XZ plane) facing upwards
+      label.rotation.x = -Math.PI / 2;
       panelGroup.add(label);
     }
   });
 
-  robot.updateMatrixWorld(true);
-
+  // Calculate the world coordinates for the stylus tip to touch the key face center
   entries.forEach(([digit, pos]) => {
-    const targetLocal = new THREE.Vector3(pos.x, centerY - KEY_DEPTH - TARGET_FACE_CLEARANCE, pos.z);
+    // The touch target sits exactly at the center-top of each key (Y = centerY)
+    const targetLocal = new THREE.Vector3(pos.x, centerY, pos.z);
     const targetWorld = panelGroup.localToWorld(targetLocal.clone());
     worldKeyPositions[digit] = {
       x: targetWorld.x,
@@ -154,5 +162,5 @@ export async function renderKeyPanel(
   });
 
   useRobotStore.getState().setKeyPositions(worldKeyPositions);
-  console.log("[renderKeyPanel] Key face targets stored:", worldKeyPositions);
+  console.log("[renderKeyPanel] Key floor targets stored:", worldKeyPositions);
 }
