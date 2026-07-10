@@ -45,7 +45,8 @@ function overrideMaterialsAndAddCollars(robot: URDFRobot) {
       // Default URDF visual meshes are steel
       child.material = STEEL_MATERIAL;
 
-      // Smooth cylinder geometry segment count
+      // Smooth cylinder geometry segment count (Commented out to test joint movement)
+      /*
       if (child.geometry && child.geometry.type === "CylinderGeometry") {
         const params = child.geometry.parameters;
         child.geometry.dispose();
@@ -56,6 +57,7 @@ function overrideMaterialsAndAddCollars(robot: URDFRobot) {
           32
         );
       }
+      */
       
       child.castShadow = true;
       child.receiveShadow = true;
@@ -291,21 +293,34 @@ export function RobotScene() {
 
     // ── Animation loop ────────────────────────────────────────────────────
     let animFrameId: number;
+    let debugFrameCount = 0;
     function animate() {
       animFrameId = requestAnimationFrame(animate);
       controls.update();
 
-      // Read current joint angles from the live robot — observation only.
-      // Joint values are never SET here; that goes through moveTo().
       const robot = useRobotStore.getState().robot;
       const jointNames = useRobotStore.getState().jointNames;
+
+      // Debug: Log joint angles and rotations every 60 frames to task output
+      debugFrameCount++;
+      if (debugFrameCount % 60 === 0 && robot) {
+        const debugInfo = Object.entries(robot.joints).map(([name, joint]: [string, any]) => {
+          return `${name}: angle=${joint.angle?.toFixed(3)}, rot=(${joint.rotation.x.toFixed(3)}, ${joint.rotation.y.toFixed(3)}, ${joint.rotation.z.toFixed(3)})`;
+        });
+        console.log("[RobotScene debug rotation] " + debugInfo.join(" | "));
+      }
+
       if (robot && jointNames.length > 0) {
         // Ensure coordinate matrices are updated before reading positions/angles
         robot.updateMatrixWorld(true);
         const angles = jointNames.map(
           (name) => (robot.joints[name]?.angle as number) ?? 0
         );
-        useRobotStore.getState().setCurrentAngles(angles);
+        const prevAngles = useRobotStore.getState().currentAngles;
+        const hasChanged = prevAngles.length !== angles.length || prevAngles.some((val, idx) => Math.abs(val - angles[idx]) > 0.0001);
+        if (hasChanged) {
+          useRobotStore.getState().setCurrentAngles(angles);
+        }
       }
 
       renderer.render(scene, camera);
