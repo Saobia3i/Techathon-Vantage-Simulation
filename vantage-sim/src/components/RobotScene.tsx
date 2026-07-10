@@ -37,23 +37,13 @@ function overrideMaterialsAndAddCollars(robot: URDFRobot) {
 
   robot.traverse((child: any) => {
     if (child.isMesh) {
-      if (child.name === "joint_collar") return;
-
-      let isJointVisual = false;
-      let parent = child.parent;
-      while (parent && parent !== robot) {
-        if (parent.isURDFJoint || parent.name.toLowerCase().includes("joint")) {
-          isJointVisual = true;
-          break;
-        }
-        parent = parent.parent;
-      }
-
-      if (isJointVisual) {
+      if (child.name === "joint_collar") {
         child.material = BRONZE_MATERIAL;
-      } else {
-        child.material = STEEL_MATERIAL;
+        return;
       }
+
+      // Default URDF visual meshes are steel
+      child.material = STEEL_MATERIAL;
 
       // Smooth cylinder geometry segment count
       if (child.geometry && child.geometry.type === "CylinderGeometry") {

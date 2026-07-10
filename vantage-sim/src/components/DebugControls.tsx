@@ -21,10 +21,13 @@ export function DebugControls() {
     if (!joint) return;
     
     const current = (joint.angle as number) ?? 0;
-    joint.setJointValue(current + delta);
+    const targetVal = current + delta;
+    
+    // Call the official robot.setJointValue API
+    robot.setJointValue(jointName, targetVal);
     robot.updateMatrixWorld(true);
     
-    console.log(`[DebugControls] ${jointName} -> ${(current + delta).toFixed(3)} rad`);
+    console.log(`[DebugControls] ${jointName} -> ${targetVal.toFixed(3)} rad`);
   }
 
   if (jointNames.length === 0) return null;
