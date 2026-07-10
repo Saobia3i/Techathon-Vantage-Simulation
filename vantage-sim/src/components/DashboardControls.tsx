@@ -3,6 +3,7 @@
 import { useRobotStore } from "@/state/robotStore";
 import { moveTo } from "@/lib/moveTo";
 import { useState } from "react";
+import * as THREE from "three";
 
 export function DashboardControls({
   onStatusChange,
@@ -33,23 +34,43 @@ export function DashboardControls({
     }
   };
 
+  // nudgeJoint uses the end-effector current world position and computes a relative
+  // Cartesian delta from a joint angle delta — all motion still goes through moveTo()
+  // so all 3 safety checks (joint limits, workspace bounds, convergence) are applied.
   const nudgeJoint = (index: number, delta: number) => {
     if (!robot) return;
     const name = jointNames[index];
     const joint = robot.joints[name];
     if (!joint) return;
 
-    const current = (joint.angle as number) ?? 0;
-    const targetVal = current + delta;
-    
-    robot.setJointValue(name, targetVal);
-    robot.updateMatrixWorld(true);
-    
-    // Trigger state sync
-    const angles = jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0);
-    useRobotStore.getState().setCurrentAngles(angles);
+    const stylusLinkName = useRobotStore.getState().stylusLinkName || "stylus_tip";
+    const eeLink = robot.links[stylusLinkName];
+    if (!eeLink) return;
 
-    onStatusChange?.(`Nudged ${name} to ${targetVal.toFixed(2)} rad`, true);
+    // Read current EE world position
+    robot.updateMatrixWorld(true);
+    const eePosNow = new THREE.Vector3();
+    eeLink.getWorldPosition(eePosNow);
+
+    // Determine joint axis in world space — use it to predict displacement
+    const axis = new THREE.Vector3()
+      .copy(joint.axis)
+      .applyQuaternion(joint.getWorldQuaternion(new THREE.Quaternion()))
+      .normalize();
+    const jointPos = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
+    const diff = new THREE.Vector3().subVectors(eePosNow, jointPos);
+    // J_i = axis × diff — the Jacobian column for this joint
+    const jacobianCol = new THREE.Vector3().crossVectors(axis, diff);
+
+    // Apply delta to get predicted new EE target
+    const newTarget = eePosNow.clone().addScaledVector(jacobianCol, delta);
+
+    const result = moveTo({ x: newTarget.x, y: newTarget.y, z: newTarget.z });
+    if (result.success) {
+      onStatusChange?.(`Nudged ${name} by ${delta > 0 ? "+" : ""}${delta.toFixed(2)} rad`, true);
+    } else {
+      onStatusChange?.(`Nudge blocked: ${result.reason}`, false, result.reason);
+    }
   };
 
   return (

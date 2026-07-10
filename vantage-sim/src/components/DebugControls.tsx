@@ -3,10 +3,14 @@
 /**
  * DebugControls — manual nudge buttons for testing forward kinematics.
  *
- * Directly calls setJointValue on the URDFRobot object in the store
- * and triggers updateMatrixWorld(true) to test propagation.
+ * Every nudge is routed through moveTo() so all 3 safety checks are enforced:
+ * 1. Joint limit clamping (inside each IK iteration)
+ * 2. Workspace bounds check (before IK)
+ * 3. Convergence check (after IK, before joint update)
  */
 import { useRobotStore } from "@/state/robotStore";
+import { moveTo } from "@/lib/moveTo";
+import * as THREE from "three";
 
 export function DebugControls() {
   const { robot, jointNames } = useRobotStore();
@@ -19,15 +23,34 @@ export function DebugControls() {
     const jointName = jointNames[index];
     const joint = robot.joints[jointName];
     if (!joint) return;
-    
-    const current = (joint.angle as number) ?? 0;
-    const targetVal = current + delta;
-    
-    // Call the official robot.setJointValue API
-    robot.setJointValue(jointName, targetVal);
+
+    const stylusLinkName = useRobotStore.getState().stylusLinkName || "stylus_tip";
+    const eeLink = robot.links[stylusLinkName];
+    if (!eeLink) return;
+
+    // Get current EE world position
     robot.updateMatrixWorld(true);
-    
-    console.log(`[DebugControls] ${jointName} -> ${targetVal.toFixed(3)} rad`);
+    const eePosNow = new THREE.Vector3();
+    eeLink.getWorldPosition(eePosNow);
+
+    // Compute Jacobian column for this joint
+    const axis = new THREE.Vector3()
+      .copy(joint.axis)
+      .applyQuaternion(joint.getWorldQuaternion(new THREE.Quaternion()))
+      .normalize();
+    const jointPos = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
+    const diff = new THREE.Vector3().subVectors(eePosNow, jointPos);
+    const jacobianCol = new THREE.Vector3().crossVectors(axis, diff);
+
+    // Predicted new EE target from joint angle delta
+    const newTarget = eePosNow.clone().addScaledVector(jacobianCol, delta);
+
+    const result = moveTo({ x: newTarget.x, y: newTarget.y, z: newTarget.z });
+    if (result.success) {
+      console.log(`[DebugControls] ${jointName} nudge accepted`);
+    } else {
+      console.warn(`[DebugControls] ${jointName} nudge blocked: ${result.reason}`);
+    }
   }
 
   if (jointNames.length === 0) return null;
