@@ -230,7 +230,7 @@ export default function Home() {
             {activeTab === "dashboard" && <DashboardControls {...controlProps} />}
             {activeTab === "joystick" && <JoystickControls {...controlProps} />}
             {activeTab === "keyboard" && <KeyboardControls {...controlProps} />}
-            {activeTab === "voice" && <VoiceControlPanel />}
+            {activeTab === "voice" && <VoiceControlPanel {...controlProps} />}
             {activeTab === "pin" && <PinControls {...controlProps} />}
           </div>
         </div>
