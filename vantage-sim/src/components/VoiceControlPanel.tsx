@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as THREE from "three";
 import { useRobotStore } from "@/state/robotStore";
-import { useVoiceCommand } from "../hooks/useVoiceCommand";
+import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { moveTo } from "@/lib/moveTo";
 
 type VoiceAction =
@@ -21,6 +21,18 @@ type AgenticResponse = {
 
 type Props = {
   onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
+};
+
+const primaryButtonStyle = {
+  backgroundColor: "var(--walnut-700)",
+  borderColor: "var(--walnut-700)",
+  color: "#ffffff",
+};
+
+const disabledButtonStyle = {
+  backgroundColor: "var(--steel-200)",
+  borderColor: "var(--steel-400)",
+  color: "var(--steel-600)",
 };
 
 function getEeWorldPosition() {
@@ -48,8 +60,11 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
   const { keyPositions } = useRobotStore();
   const { isListening, transcript, lastAction, startListening } = useVoiceCommand();
   const [agentInput, setAgentInput] = useState("");
+  const [agentTranscript, setAgentTranscript] = useState("");
   const [agentStatus, setAgentStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [agentBusy, setAgentBusy] = useState(false);
+  const [agentListening, setAgentListening] = useState(false);
+  const agentRecognitionRef = useRef<any>(null);
 
   const executeAction = (action: VoiceAction): { ok: boolean; message: string; reason?: string } => {
     const cur = getEeWorldPosition();
@@ -94,7 +109,7 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
     if (!trimmed || agentBusy) return;
 
     setAgentBusy(true);
-    setAgentStatus({ ok: true, message: "Interpreting with Groq..." });
+    setAgentStatus({ ok: true, message: "Groq is interpreting the command..." });
 
     try {
       const res = await fetch("/api/agentic-voice", {
@@ -119,7 +134,7 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
         }
       }
 
-      const msg = `${parsed.confirmation} ${actions.length} action(s) executed safely.`;
+      const msg = `${parsed.confirmation} ${actions.length} action(s) executed through moveTo.`;
       setAgentStatus({ ok: true, message: msg });
       onStatusChange?.(msg, true);
     } catch (err) {
@@ -131,6 +146,46 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
     }
   };
 
+  const startAgenticListening = () => {
+    if (agentBusy || agentListening) return;
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setAgentStatus({ ok: false, message: "Speech recognition is not supported in this browser." });
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    agentRecognitionRef.current = recognition;
+    recognition.continuous = false;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+      setAgentListening(true);
+      setAgentTranscript("");
+      setAgentStatus({ ok: true, message: "Listening for an agentic command..." });
+    };
+
+    recognition.onresult = (event: any) => {
+      const spokenText = event.results[0][0].transcript.toLowerCase().trim();
+      setAgentTranscript(spokenText);
+      void runAgenticCommand(spokenText);
+    };
+
+    recognition.onerror = () => {
+      setAgentStatus({ ok: false, message: "Agentic speech capture failed." });
+      setAgentListening(false);
+    };
+
+    recognition.onend = () => setAgentListening(false);
+    recognition.start();
+  };
+
+  const deterministicDisabled = isListening;
+  const agentMicDisabled = agentBusy || agentListening;
+  const typedDisabled = agentBusy || !agentInput.trim();
+
   return (
     <div className="space-y-5">
       <div>
@@ -138,24 +193,21 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
           Voice Control
         </p>
         <p className="text-[11px] text-[--steel-600] font-sans">
-          Deterministic commands run locally. Agentic commands use Groq, then still pass through moveTo safety validation.
+          Local speech handles fixed commands. Agentic speech sends the spoken instruction directly to Groq and executes only safe structured actions.
         </p>
       </div>
 
-      <div className="rounded border border-[--steel-200] p-3 space-y-3">
-        <p className="text-[11px] font-bold text-[--steel-600] uppercase tracking-wider font-sans">
+      <div className="rounded border border-[--steel-400] p-3 space-y-3">
+        <p className="text-[11px] font-bold text-[--walnut-700] uppercase tracking-wider font-sans">
           Deterministic Speech
         </p>
         <button
           onClick={startListening}
-          disabled={isListening}
-          className={`w-full px-4 py-2 rounded font-semibold text-sm border transition-colors ${
-            isListening
-              ? "bg-red-600 border-red-600 text-white"
-              : "bg-[--walnut-700] border-[--walnut-700] text-white hover:bg-[--walnut-900]"
-          }`}
+          disabled={deterministicDisabled}
+          className="w-full px-4 py-2 rounded font-semibold text-sm border transition-colors"
+          style={deterministicDisabled ? { backgroundColor: "#B91C1C", borderColor: "#B91C1C", color: "#ffffff" } : primaryButtonStyle}
         >
-          {isListening ? "Listening..." : "Click to Speak"}
+          {isListening ? "Listening..." : "Speak Deterministic Command"}
         </button>
         <div className="text-xs text-[--steel-600] space-y-1">
           <p><span className="font-semibold text-[--walnut-700]">You said:</span> {transcript || "..."}</p>
@@ -163,36 +215,38 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
         </div>
       </div>
 
-      <div className="rounded border border-[--steel-200] p-3 space-y-3">
-        <p className="text-[11px] font-bold text-[--steel-600] uppercase tracking-wider font-sans">
+      <div className="rounded border border-[--steel-400] p-3 space-y-3">
+        <p className="text-[11px] font-bold text-[--walnut-700] uppercase tracking-wider font-sans">
           Phase 3B Agentic Voice
         </p>
+        <button
+          onClick={startAgenticListening}
+          disabled={agentMicDisabled}
+          className="w-full px-4 py-2 rounded font-semibold text-sm border transition-colors"
+          style={agentMicDisabled ? disabledButtonStyle : primaryButtonStyle}
+        >
+          {agentListening ? "Listening..." : agentBusy ? "Thinking..." : "Speak Agentic Command"}
+        </button>
+        <div className="text-xs text-[--steel-600]">
+          <span className="font-semibold text-[--walnut-700]">Agent heard:</span> {agentTranscript || "..."}
+        </div>
+
         <textarea
           value={agentInput}
           onChange={(e) => setAgentInput(e.target.value)}
-          placeholder='Try: "move to key 4 then move up a little"'
+          placeholder='Optional typed fallback: "move to key 4 then move up a little"'
           rows={3}
-          className="w-full rounded border border-[--steel-300] bg-white px-3 py-2 text-xs text-[--walnut-900] outline-none focus:border-[--copper]"
+          className="w-full rounded border border-[--steel-400] bg-white px-3 py-2 text-xs text-[--walnut-900] outline-none focus:border-[--copper]"
         />
-        <div className="flex gap-2">
-          <button
-            onClick={() => runAgenticCommand(agentInput)}
-            disabled={agentBusy || !agentInput.trim()}
-            className="flex-1 px-3 py-2 rounded bg-[--walnut-700] text-white text-xs font-semibold disabled:opacity-40 hover:bg-[--walnut-900]"
-          >
-            {agentBusy ? "Thinking..." : "Run Agentic Command"}
-          </button>
-          <button
-            onClick={() => {
-              setAgentInput(transcript);
-              if (transcript) void runAgenticCommand(transcript);
-            }}
-            disabled={agentBusy || !transcript}
-            className="px-3 py-2 rounded border border-[--steel-400] bg-[--panel] text-[--walnut-700] text-xs font-semibold disabled:opacity-40 hover:bg-white"
-          >
-            Use Transcript
-          </button>
-        </div>
+        <button
+          onClick={() => runAgenticCommand(agentInput)}
+          disabled={typedDisabled}
+          className="w-full px-3 py-2 rounded border text-xs font-semibold transition-colors"
+          style={typedDisabled ? disabledButtonStyle : primaryButtonStyle}
+        >
+          Run Typed Agentic Command
+        </button>
+
         {agentStatus && (
           <div className={`p-2.5 rounded border text-xs font-sans ${
             agentStatus.ok
