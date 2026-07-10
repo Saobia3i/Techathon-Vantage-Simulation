@@ -55,7 +55,7 @@ export function moveTo(target: Vector3Like): IKResult {
   const targetDist = targetVec.distanceTo(robotWorldPos);
 
   // Link lengths from URDF: 0.14+0.22+0.18+0.15+0.12+0.07 = 0.88m + base offsets
-  const MAX_REACH = 0.90;
+  const MAX_REACH = 1.0;
   const MIN_REACH = 0.05;
 
   if (targetDist > MAX_REACH) {
