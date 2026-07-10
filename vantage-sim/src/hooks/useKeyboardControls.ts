@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { moveToSmooth as moveTo } from "../lib/animateArm";
+import { moveTo } from "../lib/moveTo";
 import { useRobotStore } from "../state/robotStore";
 
 export const useKeyboardControls = () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { moveToSmooth as moveTo } from "../lib/animateArm";
+import { moveTo } from "../lib/moveTo";
 import { useRobotStore } from "../state/robotStore";
 import * as THREE from "three";
 
