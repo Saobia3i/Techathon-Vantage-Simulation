@@ -11,14 +11,18 @@ import type { Vector3Like, IKResult } from "@/types/robot";
  * CONTEXT.md §6.1 — do NOT change the function signature.
  */
 export function moveTo(target: Vector3Like): IKResult {
+  console.log("[moveTo] Initiated for target:", target);
+
   const store = useRobotStore.getState();
   const robot = store.robot;
   if (!robot) {
+    console.warn("[moveTo] Failed: Robot not loaded in store");
     return { success: false, reason: "robot_not_loaded", jointAngles: [] };
   }
 
   const jointNames = store.jointNames;
   if (jointNames.length === 0) {
+    console.warn("[moveTo] Failed: No joints in store");
     return { success: false, reason: "no_joints_in_store", jointAngles: [] };
   }
 
@@ -39,6 +43,7 @@ export function moveTo(target: Vector3Like): IKResult {
   const stylusLinkName = store.stylusLinkName || "stylus_tip";
   const eeLink = robot.links[stylusLinkName];
   if (!eeLink) {
+    console.warn(`[moveTo] Failed: Stylus link "${stylusLinkName}" not found`);
     return { success: false, reason: "stylus_link_not_found", jointAngles: [] };
   }
 
@@ -50,6 +55,7 @@ export function moveTo(target: Vector3Like): IKResult {
   const MIN_REACH = 0.10; // Avoid self-collision inside base cylinder
 
   if (targetDist > MAX_REACH) {
+    console.warn(`[moveTo] Target ${targetDist.toFixed(3)}m exceeds MAX_REACH ${MAX_REACH}m`);
     return {
       success: false,
       reason: "out_of_bounds",
@@ -58,6 +64,7 @@ export function moveTo(target: Vector3Like): IKResult {
   }
 
   if (targetDist < MIN_REACH) {
+    console.warn(`[moveTo] Target ${targetDist.toFixed(3)}m is below MIN_REACH ${MIN_REACH}m`);
     return {
       success: false,
       reason: "unreachable",
@@ -68,6 +75,7 @@ export function moveTo(target: Vector3Like): IKResult {
   // Ground plane check: robot coordinates have Z as vertical up axis in URDF base frame.
   // Z must be >= -0.01m to prevent ground penetration.
   if (target.z < -0.01) {
+    console.warn(`[moveTo] Target height z=${target.z.toFixed(3)}m is below ground`);
     return {
       success: false,
       reason: "out_of_bounds",
@@ -78,10 +86,11 @@ export function moveTo(target: Vector3Like): IKResult {
   // Save current joint angles so we can revert on failure
   const originalAngles = jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0);
 
-  // 2. Damped Least Squares IK solver
-  const maxIterations = 80;
+  // 2. Damped Least Squares (DLS) IK solver
+  const maxIterations = 100;
   const tolerance = 0.005; // 5mm touch tolerance (CONTEXT.md §6.4)
   const damping = 0.05; // Damping factor lambda
+  const maxStep = 0.03; // Max task-space error step size per iteration to prevent divergence
 
   let converged = false;
 
@@ -97,9 +106,17 @@ export function moveTo(target: Vector3Like): IKResult {
     const targetWorld = robot.localToWorld(new THREE.Vector3(target.x, target.y, target.z));
 
     const error = new THREE.Vector3().subVectors(targetWorld, eePos);
-    if (error.length() < tolerance) {
+    const errorNorm = error.length();
+
+    if (errorNorm < tolerance) {
       converged = true;
+      console.log(`[moveTo] Converged in ${iter} iterations. Final error: ${(errorNorm * 1000).toFixed(2)}mm`);
       break;
+    }
+
+    // Error clamping to ensure small stable steps (prevent divergence/overshoot)
+    if (errorNorm > maxStep) {
+      error.normalize().multiplyScalar(maxStep);
     }
 
     // Compute Jacobian matrix (3 x N) for translation
@@ -151,7 +168,8 @@ export function moveTo(target: Vector3Like): IKResult {
       A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
 
     if (Math.abs(det) < 1e-9) {
-      break; // Singular matrix, abort iteration
+      console.warn(`[moveTo] Singular Jacobian at iteration ${iter}. Aborting.`);
+      break;
     }
 
     const invDet = 1.0 / det;
@@ -181,7 +199,6 @@ export function moveTo(target: Vector3Like): IKResult {
     );
 
     // Multiply J^T by temp to get dTheta
-    // dTheta_i = J_i . temp
     for (let i = 0; i < N; i++) {
       const col = J[i];
       const dTheta = col.dot(temp);
@@ -204,14 +221,13 @@ export function moveTo(target: Vector3Like): IKResult {
         const angle = (joint.angle as number) ?? 0;
         if (angle < joint.limit.lower || angle > joint.limit.upper) {
           limitsExceeded = true;
-          // Find 1-based index in the sequence of joints (e.g. joint1 is index 1, joint2 is 2...)
-          // The name format is typically 'jointN', so we can extract it or use order in jointNames
           const nameMatch = name.match(/joint(\d+)/);
           if (nameMatch) {
             failedJointIndex = parseInt(nameMatch[1], 10);
           } else {
             failedJointIndex = i + 1;
           }
+          console.warn(`[moveTo] Limit violation: joint ${name} angle=${angle.toFixed(3)} outside [${joint.limit.lower}, ${joint.limit.upper}]`);
           break;
         }
       }
@@ -233,12 +249,14 @@ export function moveTo(target: Vector3Like): IKResult {
     // Success! Save current angles to store and return
     const finalAngles = jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0);
     store.setCurrentAngles(finalAngles);
+    console.log("[moveTo] Success! Angles:", finalAngles);
     return {
       success: true,
       jointAngles: finalAngles,
     };
   } else {
     // Revert angles on convergence failure
+    console.warn("[moveTo] Solver failed to converge. Reverting joint angles.");
     jointNames.forEach((name, idx) => {
       robot.setJointValue(name, originalAngles[idx]);
     });

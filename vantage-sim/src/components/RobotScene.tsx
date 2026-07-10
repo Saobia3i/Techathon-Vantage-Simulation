@@ -104,6 +104,7 @@ export function RobotScene() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     const container = containerRef.current;
     if (!container) return;
 
@@ -190,6 +191,7 @@ export function RobotScene() {
     loader.load(
       "/robot/arm.urdf",
       (robot: URDFRobot) => {
+        if (!active) return;
         // Override visual materials and add joint collars for realistic look
         overrideMaterialsAndAddCollars(robot);
 
@@ -353,6 +355,7 @@ export function RobotScene() {
 
     // ── Cleanup ───────────────────────────────────────────────────────────
     return () => {
+      active = false;
       cancelAnimationFrame(animFrameId);
       resizeObserver.disconnect();
       controls.dispose();
@@ -360,6 +363,7 @@ export function RobotScene() {
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
+      useRobotStore.getState().setRobot(null as any);
     };
   }, []);
 
