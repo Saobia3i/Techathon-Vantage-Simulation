@@ -132,14 +132,14 @@ export function RobotScene() {
         // ── Render key panel (parented to robot root) ───────────────────
         renderKeyPanel(scene, robot);
       },
-      (progress: ProgressEvent) => {
-        if (progress.total > 0) {
+      (progress?: ProgressEvent) => {
+        if (progress && progress.total > 0) {
           console.log(
             `[RobotScene] Loading URDF: ${Math.round((progress.loaded / progress.total) * 100)}%`
           );
         }
       },
-      (err: ErrorEvent) => {
+      (err: any) => {
         console.error("[RobotScene] URDF load failed:", err);
       }
     );
