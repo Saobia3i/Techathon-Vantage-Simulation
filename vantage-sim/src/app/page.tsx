@@ -6,7 +6,7 @@ import { TelemetryPanel } from "@/components/TelemetryPanel";
 import { DashboardControls } from "@/components/DashboardControls";
 import { JoystickControls } from "@/components/JoystickControls";
 import { KeyboardControls } from "@/components/KeyboardControls";
-import { VoiceControls } from "@/components/VoiceControls";
+import VoiceControlPanel from "@/components/VoiceControlPanel";
 import { PinControls } from "@/components/PinControls";
 
 type SurfaceTab = "dashboard" | "joystick" | "keyboard" | "voice" | "pin";
@@ -230,7 +230,7 @@ export default function Home() {
             {activeTab === "dashboard" && <DashboardControls {...controlProps} />}
             {activeTab === "joystick" && <JoystickControls {...controlProps} />}
             {activeTab === "keyboard" && <KeyboardControls {...controlProps} />}
-            {activeTab === "voice" && <VoiceControls {...controlProps} />}
+            {activeTab === "voice" && <VoiceControlPanel />}
             {activeTab === "pin" && <PinControls {...controlProps} />}
           </div>
         </div>
