@@ -26,7 +26,7 @@ function finish(
   return success ? { success, jointAngles, report } : { success, reason, jointAngles, report };
 }
 
-function checkCollision(robot: any, activeNames: string[], eeLink: any): { collision: boolean; reason?: string } {
+export function checkCollision(robot: any, activeNames: string[], eeLink: any): { collision: boolean; reason?: string } {
   const points: THREE.Vector3[] = [];
 
   // Add all joints from joint1 to joint6 in kinematic order

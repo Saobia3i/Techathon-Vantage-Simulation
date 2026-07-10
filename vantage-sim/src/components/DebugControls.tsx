@@ -9,8 +9,7 @@
  * 3. Convergence check (after IK, before joint update)
  */
 import { useRobotStore } from "@/state/robotStore";
-import { moveToSmooth as moveTo } from "@/lib/animateArm";
-import * as THREE from "three";
+import { checkCollision } from "@/lib/moveTo";
 
 export function DebugControls() {
   const { robot, jointNames } = useRobotStore();
@@ -28,28 +27,40 @@ export function DebugControls() {
     const eeLink = robot.links[stylusLinkName];
     if (!eeLink) return;
 
-    // Get current EE world position
+    const currentVal = (joint.angle as number) ?? 0;
+    let targetVal = currentVal + delta;
+
+    // 1. Clamp to joint limits
+    if (joint.jointType === "revolute" && joint.limit) {
+      targetVal = Math.max(joint.limit.lower, Math.min(joint.limit.upper, targetVal));
+    }
+
+    if (Math.abs(targetVal - currentVal) < 1e-4) {
+      console.warn(`[DebugControls] Nudge blocked: ${jointName} is at its limit`);
+      return;
+    }
+
+    // 2. Temporarily set joint value for collision check
+    robot.setJointValue(jointName, targetVal);
     robot.updateMatrixWorld(true);
-    const eePosNow = new THREE.Vector3();
-    eeLink.getWorldPosition(eePosNow);
 
-    // Compute Jacobian column for this joint
-    const axis = new THREE.Vector3()
-      .copy(joint.axis)
-      .applyQuaternion(joint.getWorldQuaternion(new THREE.Quaternion()))
-      .normalize();
-    const jointPos = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
-    const diff = new THREE.Vector3().subVectors(eePosNow, jointPos);
-    const jacobianCol = new THREE.Vector3().crossVectors(axis, diff);
+    // 3. Collision check
+    const activeNames = jointNames.filter((n) => {
+      const j = robot.joints[n];
+      return j && (j.jointType === "revolute" || j.jointType === "continuous");
+    });
+    const coll = checkCollision(robot, activeNames, eeLink);
 
-    // Predicted new EE target from joint angle delta
-    const newTarget = eePosNow.clone().addScaledVector(jacobianCol, delta);
-
-    const result = moveTo({ x: newTarget.x, y: newTarget.y, z: newTarget.z });
-    if (result.success) {
-      console.log(`[DebugControls] ${jointName} nudge accepted`);
+    if (coll.collision) {
+      // Revert change
+      robot.setJointValue(jointName, currentVal);
+      robot.updateMatrixWorld(true);
+      console.warn(`[DebugControls] Nudge blocked: collision detected (${coll.reason})`);
     } else {
-      console.warn(`[DebugControls] ${jointName} nudge blocked: ${result.reason}`);
+      // Accept change and sync store state
+      const angles = jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0);
+      useRobotStore.getState().setCurrentAngles(angles);
+      console.log(`[DebugControls] Nudged ${jointName} to ${targetVal.toFixed(3)} rad`);
     }
   }
 
