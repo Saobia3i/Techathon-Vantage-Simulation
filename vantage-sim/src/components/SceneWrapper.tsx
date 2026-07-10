@@ -10,12 +10,12 @@ import dynamic from "next/dynamic";
 
 function SceneLoading() {
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-[#0d0d14]">
-      <div className="relative w-12 h-12">
-        <div className="absolute inset-0 rounded-full border-2 border-blue-500/20" />
-        <div className="absolute inset-0 rounded-full border-2 border-t-blue-400 animate-spin" />
+    <div className="w-full h-full flex flex-col items-center justify-center gap-3" style={{ background: "var(--steel-100)" }}>
+      <div className="relative w-10 h-10">
+        <div className="absolute inset-0 rounded-full border-2" style={{ borderColor: "var(--steel-200)" }} />
+        <div className="absolute inset-0 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--copper)", borderTopColor: "transparent" }} />
       </div>
-      <p className="text-sm text-white/30 font-mono tracking-wide animate-pulse">
+      <p className="text-xs font-sans animate-pulse" style={{ color: "var(--steel-400)", letterSpacing: "0.05em" }}>
         Loading URDF…
       </p>
     </div>

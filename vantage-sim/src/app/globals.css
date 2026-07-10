@@ -1,76 +1,65 @@
 @import "tailwindcss";
 
 :root {
-  --bg-base: #121212;
-  --bg-panel: #1c1b19;
-  --border-subtle: #2a2825;
-  --steel: #c4c9d0;
-  --bronze: #8b5e3c;
-  --accent-glow: #d4a574;
-  --text-primary: #edeae4;
-  --text-secondary: #8a8680;
-  --status-green: #6ee7a8;
-  --status-blue: #7cb8e8;
+  --walnut-900: #2A1D14;
+  --walnut-700: #4A3423;
+  --walnut-500: #6E4C33;
+  --copper: #B8763F;
+  --steel-100: #EDEBE6;
+  --steel-200: #D8D5CD;
+  --steel-400: #A9A69C;
+  --steel-600: #7A776E;
+  --panel: #F6F4F0;
+  --ink: #241A12;
+  --safe-bg: #E4EFE2;
+  --safe-text: #2F5C2A;
 
-  --font-sans: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 @theme inline {
-  --color-background: var(--bg-base);
-  --color-foreground:  var(--text-primary);
+  --color-background: var(--steel-100);
+  --color-foreground: var(--ink);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
 
-
-
 html,
 body {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  background: var(--bg-base);
-  color: var(--text-primary);
+  margin: 0;
+  background: var(--steel-100);
+  color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Scrollbar styling (for the dashboard sidebar) ────────────────── */
+/* ── Scrollbar styling ─────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
+  background: var(--steel-200);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--steel-400);
 }
 
 /* ── Selection ────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(139, 94, 60, 0.35); /* Bronze tint */
-  color: #fff;
+  background: rgba(184, 118, 63, 0.25); /* Copper tint */
+  color: var(--walnut-900);
 }
 
-/* ── Custom Animations ────────────────────────────────────────────── */
-@keyframes slideIn {
-  from {
-    transform: translateY(-8px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+/* ── Custom Utilities ──────────────────────────────────────────────── */
+.scene-grid-bg {
+  background:
+    linear-gradient(var(--steel-200) 1px, transparent 1px) 0 0/28px 28px,
+    linear-gradient(90deg, var(--steel-200) 1px, transparent 1px) 0 0/28px 28px,
+    var(--steel-100);
 }
-
-.animate-slide-in {
-  animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-

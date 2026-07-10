@@ -120,8 +120,8 @@ export function RobotScene() {
 
     // ── Scene ─────────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x121212);
-    scene.fog = new THREE.FogExp2(0x121212, 0.12);
+    scene.background = new THREE.Color(0xf6f4f0);
+    scene.fog = new THREE.FogExp2(0xf6f4f0, 0.06);
 
     // ── Environment Reflection (PBR) ──────────────────────────────────────
     const pmremGenerator = new PMREMGenerator(renderer);
@@ -146,18 +146,18 @@ export function RobotScene() {
     controls.update();
 
     // ── Lighting (3-Point Setup) ──────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
     
-    const keyLight = new THREE.DirectionalLight(0xfff4e6, 1.1);
+    const keyLight = new THREE.DirectionalLight(0xfff8ee, 1.25);
     keyLight.position.set(3, 4, 2);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
     keyLight.shadow.mapSize.height = 2048;
     
-    const fillLight = new THREE.DirectionalLight(0xe6f0ff, 0.4);
+    const fillLight = new THREE.DirectionalLight(0xeef5ff, 0.5);
     fillLight.position.set(-3, 2, -2);
     
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
     rimLight.position.set(0, 2, -4);
     
     scene.add(keyLight, fillLight, rimLight);
@@ -166,17 +166,17 @@ export function RobotScene() {
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(6, 6),
       new THREE.MeshStandardMaterial({
-        color: 0x1a1a1a,
-        roughness: 0.25,
-        metalness: 0.8,
+        color: 0xd8d5cd, // matches --steel-200
+        roughness: 0.5,
+        metalness: 0.1,
       })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Grid helper for spatial reference (low opacity dark lines)
-    const grid = new THREE.GridHelper(4, 20, 0x2a2825, 0x1c1b19);
+    // Grid helper for spatial reference (warm steel colors)
+    const grid = new THREE.GridHelper(4, 20, 0xa9a69c, 0xd8d5cd);
     grid.position.y = 0.001;
     scene.add(grid);
 
