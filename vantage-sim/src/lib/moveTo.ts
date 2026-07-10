@@ -89,6 +89,17 @@ export function moveTo(target: Vector3Like): IKResult {
   // Save original angles so we can revert on failure
   const originalAngles = jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0);
 
+  // Singularity kick: If the arm is perfectly straight (singular), nudge joint2/joint3
+  // to break the mathematical symmetry and prevent Jacobian column lock-up.
+  const isSingular =
+    Math.abs((robot.joints["joint2"]?.angle as number) ?? 0) < 0.01 &&
+    Math.abs((robot.joints["joint3"]?.angle as number) ?? 0) < 0.01;
+  if (isSingular) {
+    if (robot.joints["joint2"]) robot.setJointValue("joint2", 0.05);
+    if (robot.joints["joint3"]) robot.setJointValue("joint3", 0.10);
+    robot.updateMatrixWorld(true);
+  }
+
   // ── 2. Damped Least Squares IK Solver ───────────────────────────────────
   const maxIterations = 150;
   const tolerance = 0.005;   // 5mm convergence threshold (CONTEXT.md §6.4)

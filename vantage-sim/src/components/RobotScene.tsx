@@ -200,6 +200,12 @@ export function RobotScene() {
         robot.castShadow = true;
         scene.add(robot);
 
+        // Initialize with a default bent ready pose to avoid singularities
+        if (robot.joints["joint2"]) robot.setJointValue("joint2", 0.4);
+        if (robot.joints["joint3"]) robot.setJointValue("joint3", 0.8);
+        if (robot.joints["joint5"]) robot.setJointValue("joint5", 0.4);
+        robot.updateMatrixWorld(true);
+
         // ── Publish to shared store (read by IK, dashboard, PIN entry) ──
         const store = useRobotStore.getState();
         store.setRobot(robot);
