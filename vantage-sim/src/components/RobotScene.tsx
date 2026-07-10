@@ -210,6 +210,19 @@ export function RobotScene() {
         store.setJointNames(jointNames);
         store.setLinkNames(linkNames);
 
+        // Populate joint limits in store
+        const jointLimits = jointNames.map((name) => {
+          const joint = robot.joints[name];
+          if (joint.jointType === "revolute") {
+            return {
+              lower: joint.limit.lower,
+              upper: joint.limit.upper,
+            };
+          }
+          return { lower: -Math.PI, upper: Math.PI };
+        });
+        store.setJointLimits(jointLimits);
+
         // ── RUN AUTOMATIC DIAGNOSTICS FOR CHECKS 1-6 ────────────────────
         console.group("🔍 DIGITAL TWIN DIAGNOSTICS (Checks 1-6)");
         
