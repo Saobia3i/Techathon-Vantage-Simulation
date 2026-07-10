@@ -45,8 +45,7 @@ export default function JoystickControl() {
         const eeLink = robot.links[linkName];
         if (!eeLink) return;
         robot.updateMatrixWorld(true);
-        const v = new THREE.Vector3();
-        eeLink.getWorldPosition(v);
+        const v = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
 
         const angle = data.angle.radian;
         // Normalize distance 0→1
@@ -84,8 +83,7 @@ export default function JoystickControl() {
     const eeLink = robot.links[linkName];
     if (!eeLink) return;
     robot.updateMatrixWorld(true);
-    const v = new THREE.Vector3();
-    eeLink.getWorldPosition(v);
+    const v = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
     moveTo({ x: v.x, y: newY, z: v.z });
   };
 

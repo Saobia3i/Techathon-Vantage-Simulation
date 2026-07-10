@@ -25,8 +25,8 @@ export function JoystickControls({ onStatusChange }: Props) {
     if (!robot || !stylusLinkName) return null;
     const link = robot.links[stylusLinkName];
     if (!link) return null;
-    const v = new THREE.Vector3();
-    link.getWorldPosition(v);
+    robot.updateMatrixWorld(true);
+    const v = link.localToWorld(new THREE.Vector3(0, 0, 0.04));
     return { x: v.x, y: v.y, z: v.z }; // Return world coordinates directly
   }, [robot, stylusLinkName]);
 
@@ -87,8 +87,7 @@ export function JoystickControls({ onStatusChange }: Props) {
         const eeLink = robot.links[name];
         if (!eeLink) return;
         robot.updateMatrixWorld(true);
-        const v = new THREE.Vector3();
-        eeLink.getWorldPosition(v);
+        const v = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
 
         const angle = data.angle.radian;
         // Normalize distance: 0 (center) to 1 (full deflection)

@@ -40,16 +40,12 @@ export function checkCollision(robot: any, activeNames: string[], eeLink: any): 
     }
   }
 
-  // Add end-effector tip
-  const eePos = new THREE.Vector3();
-  eeLink.getWorldPosition(eePos);
+  // Add end-effector tip (actual physical tip lies at local Z=0.04m)
+  const eePos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
   points.push(eePos);
 
   // Sample points along the segment connecting adjacent joints/links to check
-  // for ground penetration (Y < 0 in Three.js world space).
-  // NOTE: board collision is not checked here because the key panel sits at
-  // positive Z in Three.js world space (robot is rotated -PI/2 on X).
-  // The workspace bounds check (MAX_REACH) already prevents out-of-range targets.
+  // for ground and board collisions.
   for (let i = 0; i < points.length - 1; i++) {
     const start = points[i];
     const end = points[i + 1];
@@ -57,11 +53,17 @@ export function checkCollision(robot: any, activeNames: string[], eeLink: any): 
     // Sample 8 intermediate points along each link cylinder segment
     for (let k = 0; k <= 7; k++) {
       const t = k / 7;
+      const x = (1 - t) * start.x + t * end.x;
       const y = (1 - t) * start.y + t * end.y;
+      const z = (1 - t) * start.z + t * end.z;
 
-      // Allow 1mm tolerance for floating-point noise at the base plane
-      if (y < -0.001) {
-        return { collision: true, reason: "ground_collision" };
+      // Board region: x in [0.06, 0.20] and z in [0.24, 0.35]
+      const insideBoard = x >= 0.06 && x <= 0.20 && z >= 0.24 && z <= 0.35;
+      const minAllowedY = insideBoard ? 0.038 : -0.001;
+
+      // Allow 1mm tolerance
+      if (y < minAllowedY) {
+        return { collision: true, reason: insideBoard ? "board_collision" : "ground_collision" };
       }
     }
   }
@@ -157,27 +159,22 @@ export function moveTo(target: Vector3Like): IKResult {
     return finish(report, false, currentJointAngles(), "unreachable");
   }
 
+  const insideBoard = target.x >= 0.06 && target.x <= 0.20 && target.z >= 0.24 && target.z <= 0.35;
+  const minTargetY = insideBoard ? 0.038 : GROUND_MIN_Y;
+
   report.steps.push({
-    label: "Ground guard",
-    equation: `target.y >= ${GROUND_MIN_Y}`,
-    output: `${fmt(target.y)} >= ${GROUND_MIN_Y} is ${target.y >= GROUND_MIN_Y}`,
-    why: "The stylus is not allowed to target a point below the floor plane.",
+    label: "Ground/Board guard",
+    equation: `target.y >= ${minTargetY.toFixed(3)}`,
+    output: `${fmt(target.y)} >= ${minTargetY.toFixed(3)} is ${target.y >= minTargetY}`,
+    why: insideBoard
+      ? "Target is within the key board region; height must be above the board surface."
+      : "Target height must remain above the ground plane.",
   });
 
-  if (target.y < GROUND_MIN_Y) {
-    console.warn(`[moveTo] Below ground: y=${target.y.toFixed(3)}`);
+  if (target.y < minTargetY) {
+    console.warn(`[moveTo] Target below safety boundary: y=${target.y.toFixed(3)} (insideBoard=${insideBoard})`);
     return finish(report, false, currentJointAngles(), "out_of_bounds");
   }
-
-  report.steps.push({
-    label: "Board guard",
-    equation: "target.y >= 0 (ground guard covers all planes; board is in front at +Z)",
-    output: `Board collision prevention via workspace radius limit (MAX_REACH = ${MAX_REACH} m)`,
-    why: "The panel board sits at positive Z in Three.js world space after the robot's -PI/2 X rotation; MAX_REACH already prevents unreachable targets.",
-  });
-  // Note: No target.z < BOARD_MIN_Z guard — after robot.rotation.x = -Math.PI/2 the URDF +Y
-  // axis maps to Three.js +Z. The board is in front of the robot (positive Z), not negative.
-  // The workspace radius bound (MAX_REACH = 1.0m) is the correct guard for out-of-range targets.
 
   const originalAngles = currentJointAngles();
 
@@ -209,8 +206,7 @@ export function moveTo(target: Vector3Like): IKResult {
     iterationsUsed = iter + 1;
     robot.updateMatrixWorld(true);
 
-    const eePos = new THREE.Vector3();
-    eeLink.getWorldPosition(eePos);
+    const eePos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
     finalEePos.copy(eePos);
 
     const error = new THREE.Vector3().subVectors(targetWorld, eePos);
@@ -299,7 +295,7 @@ export function moveTo(target: Vector3Like): IKResult {
 
   report.iterations = iterationsUsed;
   robot.updateMatrixWorld(true);
-  eeLink.getWorldPosition(finalEePos);
+  finalEePos.copy(eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04)));
   const finalError = targetWorld.distanceTo(finalEePos);
   const finalConverged = converged || finalError < TOLERANCE;
   report.finalWorld = { x: finalEePos.x, y: finalEePos.y, z: finalEePos.z };
