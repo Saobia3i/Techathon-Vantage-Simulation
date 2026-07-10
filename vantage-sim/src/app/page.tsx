@@ -7,7 +7,7 @@ import { DashboardControls } from "@/components/DashboardControls";
 import { JoystickControls } from "@/components/JoystickControls";
 import { KeyboardControls } from "@/components/KeyboardControls";
 import VoiceControlPanel from "@/components/VoiceControlPanel";
-import { PinControls } from "@/components/PinControls";
+import  PinControls  from "@/components/PinControls";
 
 type SurfaceTab = "dashboard" | "joystick" | "keyboard" | "voice" | "pin";
 
