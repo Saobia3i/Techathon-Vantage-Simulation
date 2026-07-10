@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "author": "Vantage Robotics",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": -150, "left": -300, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot2", "top": -50, "left": -300, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot3", "top": 50, "left": -300, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot4", "top": 150, "left": -300, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot5", "top": 250, "left": -300, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot6", "top": 350, "left": -300, "attrs": {} },
+    
+    { "type": "wokwi-servo", "id": "servo1", "top": -150, "left": 250, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo2", "top": -50, "left": 250, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo3", "top": 50, "left": 250, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo4", "top": 150, "left": 250, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo5", "top": 250, "left": 250, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo6", "top": 350, "left": 250, "attrs": {} },
+    
+    { "type": "wokwi-led", "id": "led_in1", "top": -150, "left": -100, "attrs": { "color": "red" } },
+    { "type": "wokwi-led", "id": "led_in2", "top": -50, "left": -100, "attrs": { "color": "red" } },
+    { "type": "wokwi-led", "id": "led_in3", "top": 50, "left": -100, "attrs": { "color": "red" } },
+    { "type": "wokwi-led", "id": "led_in4", "top": 150, "left": -100, "attrs": { "color": "red" } },
+    { "type": "wokwi-led", "id": "led_in5", "top": 250, "left": -100, "attrs": { "color": "red" } },
+    { "type": "wokwi-led", "id": "led_in6", "top": 350, "left": -100, "attrs": { "color": "red" } },
+    
+    { "type": "wokwi-led", "id": "led_status", "top": -200, "left": 50, "attrs": { "color": "green" } }
+  ],
+  "connections": [
+    ["pot1:VCC", "esp:3V3", "red", []],
+    ["pot2:VCC", "esp:3V3", "red", []],
+    ["pot3:VCC", "esp:3V3", "red", []],
+    ["pot4:VCC", "esp:3V3", "red", []],
+    ["pot5:VCC", "esp:3V3", "red", []],
+    ["pot6:VCC", "esp:3V3", "red", []],
+    
+    ["pot1:GND", "esp:GND.1", "black", []],
+    ["pot2:GND", "esp:GND.1", "black", []],
+    ["pot3:GND", "esp:GND.1", "black", []],
+    ["pot4:GND", "esp:GND.1", "black", []],
+    ["pot5:GND", "esp:GND.1", "black", []],
+    ["pot6:GND", "esp:GND.1", "black", []],
+    
+    ["pot1:SIG", "esp:32", "yellow", []],
+    ["pot2:SIG", "esp:33", "yellow", []],
+    ["pot3:SIG", "esp:34", "yellow", []],
+    ["pot4:SIG", "esp:35", "yellow", []],
+    ["pot5:SIG", "esp:36", "yellow", []],
+    ["pot6:SIG", "esp:39", "yellow", []],
+    
+    ["servo1:V+", "esp:VIN", "red", []],
+    ["servo2:V+", "esp:VIN", "red", []],
+    ["servo3:V+", "esp:VIN", "red", []],
+    ["servo4:V+", "esp:VIN", "red", []],
+    ["servo5:V+", "esp:VIN", "red", []],
+    ["servo6:V+", "esp:VIN", "red", []],
+    
+    ["servo1:GND", "esp:GND.2", "black", []],
+    ["servo2:GND", "esp:GND.2", "black", []],
+    ["servo3:GND", "esp:GND.2", "black", []],
+    ["servo4:GND", "esp:GND.2", "black", []],
+    ["servo5:GND", "esp:GND.2", "black", []],
+    ["servo6:GND", "esp:GND.2", "black", []],
+    
+    ["servo1:PWM", "esp:12", "orange", []],
+    ["servo2:PWM", "esp:13", "orange", []],
+    ["servo3:PWM", "esp:14", "orange", []],
+    ["servo4:PWM", "esp:15", "orange", []],
+    ["servo5:PWM", "esp:25", "orange", []],
+    ["servo6:PWM", "esp:26", "orange", []],
+    
+    ["led_in1:A", "esp:4", "blue", []],
+    ["led_in2:A", "esp:5", "blue", []],
+    ["led_in3:A", "esp:16", "blue", []],
+    ["led_in4:A", "esp:17", "blue", []],
+    ["led_in5:A", "esp:18", "blue", []],
+    ["led_in6:A", "esp:19", "blue", []],
+    
+    ["led_in1:C", "esp:GND.1", "black", []],
+    ["led_in2:C", "esp:GND.1", "black", []],
+    ["led_in3:C", "esp:GND.1", "black", []],
+    ["led_in4:C", "esp:GND.1", "black", []],
+    ["led_in5:C", "esp:GND.1", "black", []],
+    ["led_in6:C", "esp:GND.1", "black", []],
+    
+    ["led_status:A", "esp:21", "green", []],
+    ["led_status:C", "esp:GND.3", "black", []]
+  ],
+  "dependencies": {}
+}
