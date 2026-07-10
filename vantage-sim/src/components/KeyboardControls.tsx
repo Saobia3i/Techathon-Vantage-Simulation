@@ -5,7 +5,8 @@ import { moveTo } from "@/lib/moveTo";
 import * as THREE from "three";
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const STEP = 0.02; // 2cm per keypress
+const STEP_NORMAL = 0.02;  // 2 cm
+const STEP_FINE   = 0.005; // 5 mm — teammate's Shift fine-step
 
 const KEY_BINDINGS = [
   { key: "W", axis: "y" as const, dir: 1, label: "+Y (forward)" },
@@ -23,6 +24,7 @@ export function KeyboardControls({
 }) {
   const { robot, stylusLinkName } = useRobotStore();
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [shiftHeld, setShiftHeld] = useState(false);
   const [focused, setFocused] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(true);
@@ -38,18 +40,20 @@ export function KeyboardControls({
   }, [robot, stylusLinkName]);
 
   const handleNudge = useCallback(
-    (axis: "x" | "y" | "z", dir: number) => {
+    (axis: "x" | "y" | "z", dir: number, fine: boolean) => {
       const curPos = getEePos();
       if (!curPos) return;
+      const step = fine ? STEP_FINE : STEP_NORMAL;
       const target = {
-        x: curPos.x + (axis === "x" ? STEP * dir : 0),
-        y: curPos.y + (axis === "y" ? STEP * dir : 0),
-        z: curPos.z + (axis === "z" ? STEP * dir : 0),
+        x: curPos.x + (axis === "x" ? step * dir : 0),
+        y: curPos.y + (axis === "y" ? step * dir : 0),
+        z: curPos.z + (axis === "z" ? step * dir : 0),
       };
       const res = moveTo(target);
       if (res.success) {
         setIsSuccess(true);
-        const msg = `[${axis.toUpperCase()}${dir > 0 ? "+" : "−"}] EE moved to (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`;
+        const label = fine ? "fine" : "step";
+        const msg = `[${axis.toUpperCase()}${dir > 0 ? "+" : "−"}][${label}] → (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`;
         setFeedback(msg);
         onStatusChange?.(msg, true);
       } else {
@@ -65,13 +69,15 @@ export function KeyboardControls({
   useEffect(() => {
     if (!focused) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Shift") { setShiftHeld(true); return; }
       const binding = KEY_BINDINGS.find((b) => b.key === e.key.toUpperCase());
       if (!binding) return;
       e.preventDefault();
       setActiveKey(e.key.toUpperCase());
-      handleNudge(binding.axis, binding.dir);
+      handleNudge(binding.axis, binding.dir, e.shiftKey);
     };
     const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setShiftHeld(false);
       setActiveKey(null);
     };
     window.addEventListener("keydown", onKeyDown);
@@ -89,7 +95,9 @@ export function KeyboardControls({
           Keyboard control surface
         </p>
         <p className="text-[11px] text-[--steel-600] font-sans mb-3">
-          Click the activation zone below, then use WASD + QE to drive the arm.
+          Click the activation zone, then use WASD + QE to drive the arm.{" "}
+          <kbd className="px-1 py-0.5 rounded border border-[--steel-400] bg-white text-[10px] font-mono text-[--walnut-900]">⇧ Shift</kbd>{" "}
+          <span className="text-[11px]">enables fine-step (5 mm).</span>
         </p>
       </div>
 
@@ -98,18 +106,20 @@ export function KeyboardControls({
         ref={panelRef}
         tabIndex={0}
         onFocus={() => setFocused(true)}
-        onBlur={() => { setFocused(false); setActiveKey(null); }}
+        onBlur={() => { setFocused(false); setActiveKey(null); setShiftHeld(false); }}
         className={`relative flex items-center justify-center h-20 rounded border-2 cursor-pointer select-none outline-none transition-all ${
           focused
-            ? "border-[--copper] bg-[--copper]/10"
+            ? shiftHeld
+              ? "border-amber-500 bg-amber-50"
+              : "border-[--copper] bg-[--copper]/10"
             : "border-dashed border-[--steel-400] bg-[--panel] hover:border-[--copper]/50"
         }`}
       >
         <span className="text-sm font-sans font-medium text-[--steel-600]">
           {focused ? (
-            <span className="text-[--copper] font-semibold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[--copper] animate-pulse inline-block" />
-              Keyboard controls: ACTIVE
+            <span className={`font-semibold flex items-center gap-2 ${shiftHeld ? "text-amber-600" : "text-[--copper]"}`}>
+              <span className={`w-2 h-2 rounded-full animate-pulse inline-block ${shiftHeld ? "bg-amber-500" : "bg-[--copper]"}`} />
+              {shiftHeld ? "FINE-STEP active (5 mm)" : "Keyboard controls: ACTIVE"}
             </span>
           ) : (
             "Click here to activate keyboard controls"
