@@ -164,13 +164,13 @@ export default function Home() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 300px",
+            gridTemplateColumns: "1fr 360px 280px",
             gap: "20px",
             alignItems: "start",
           }}
           className="grid-layout"
         >
-          {/* Left — Scene + Active Control */}
+          {/* Column 1 — Scene View */}
           <div
             className="panel"
             style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
@@ -199,28 +199,31 @@ export default function Home() {
               <SceneWrapper />
             </div>
 
-            <p style={{ fontSize: "12px", color: "var(--steel-600)", marginTop: "10px" }}>
+            <p style={{ fontSize: "12px", color: "var(--steel-600)", marginTop: "10px", marginBottom: 0 }}>
               Rendered from the provided URDF via urdf-loader. Drag to orbit &middot; scroll to zoom &middot; right-drag to pan.{" "}
               <b style={{ color: "var(--walnut-700)", fontWeight: 500 }}>Approach → touch → retract</b> per digit, verified within ±5 mm.
             </p>
-
-            {/* Active Control Surface */}
-            <div style={{ marginTop: "20px", paddingTop: "18px", borderTop: "1px solid var(--steel-200)" }}>
-              <p
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: "14px", color: "var(--walnut-700)", margin: "0 0 14px", textTransform: "uppercase", letterSpacing: "0.06em" }}
-              >
-                Control Surface — {TABS.find((t) => t.id === activeTab)?.label}
-              </p>
-
-              {activeTab === "dashboard" && <DashboardControls {...controlProps} />}
-              {activeTab === "joystick" && <JoystickControls {...controlProps} />}
-              {activeTab === "keyboard" && <KeyboardControls {...controlProps} />}
-              {activeTab === "voice" && <VoiceControls {...controlProps} />}
-              {activeTab === "pin" && <PinControls {...controlProps} />}
-            </div>
           </div>
 
-          {/* Right — Telemetry */}
+          {/* Column 2 — Active Control Surface */}
+          <div
+            className="panel"
+            style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
+          >
+            <p
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: "15px", color: "var(--walnut-700)", margin: "0 0 14px", textTransform: "uppercase", letterSpacing: "0.06em" }}
+            >
+              Control Surface — {TABS.find((t) => t.id === activeTab)?.label}
+            </p>
+
+            {activeTab === "dashboard" && <DashboardControls {...controlProps} />}
+            {activeTab === "joystick" && <JoystickControls {...controlProps} />}
+            {activeTab === "keyboard" && <KeyboardControls {...controlProps} />}
+            {activeTab === "voice" && <VoiceControls {...controlProps} />}
+            {activeTab === "pin" && <PinControls {...controlProps} />}
+          </div>
+
+          {/* Column 3 — Telemetry */}
           <div
             style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
           >
@@ -241,7 +244,7 @@ export default function Home() {
       </div>
 
       <style>{`
-        @media (max-width: 760px) {
+        @media (max-width: 960px) {
           .grid-layout { grid-template-columns: 1fr !important; }
         }
       `}</style>

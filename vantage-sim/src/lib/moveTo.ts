@@ -5,13 +5,18 @@ import type { Vector3Like, IKResult } from "@/types/robot";
 /**
  * moveTo() — Damped Least Squares Inverse Kinematics Solver and Safety Validator.
  *
- * Runs Jacobian-based IK to find joint angles that bring the end-effector
- * to the target position, checks workspace bounds, convergence, and joint limits.
+ * TARGET COORDINATE FRAME: THREE.JS WORLD SPACE
+ *   - All callers (controls, PIN sequencer, voice) pass world-space (x,y,z).
+ *   - The robot is mounted in the scene with robot.rotation.x = -PI/2 (Z-up URDF → Y-up Three.js).
+ *   - We operate entirely in world space: no localToWorld conversion needed in the solver loop.
+ *
+ * Workspace check:
+ *   - Computed as Euclidean distance from the robot's world origin to the target.
  *
  * CONTEXT.md §6.1 — do NOT change the function signature.
  */
 export function moveTo(target: Vector3Like): IKResult {
-  console.log("[moveTo] Initiated for target:", target);
+  console.log("[moveTo] Target (world):", target);
 
   const store = useRobotStore.getState();
   const robot = store.robot;
@@ -26,16 +31,11 @@ export function moveTo(target: Vector3Like): IKResult {
     return { success: false, reason: "no_joints_in_store", jointAngles: [] };
   }
 
-  // Identify movable joints (revolute or continuous) to solve for
-  const activeIndices: number[] = [];
+  // Identify movable joints (revolute or continuous)
   const activeNames: string[] = [];
-  jointNames.forEach((name, idx) => {
+  jointNames.forEach((name) => {
     const joint = robot.joints[name];
-    if (
-      joint &&
-      (joint.jointType === "revolute" || joint.jointType === "continuous")
-    ) {
-      activeIndices.push(idx);
+    if (joint && (joint.jointType === "revolute" || joint.jointType === "continuous")) {
       activeNames.push(name);
     }
   });
@@ -47,108 +47,107 @@ export function moveTo(target: Vector3Like): IKResult {
     return { success: false, reason: "stylus_link_not_found", jointAngles: [] };
   }
 
-  // 1. Workspace bounds check (target is in the robot's local base frame)
+  // ── 1. Workspace bounds check ────────────────────────────────────────────
+  // Get the robot's world position (its root in Three.js scene)
+  robot.updateMatrixWorld(true);
+  const robotWorldPos = new THREE.Vector3().setFromMatrixPosition(robot.matrixWorld);
   const targetVec = new THREE.Vector3(target.x, target.y, target.z);
-  const targetDist = targetVec.length();
+  const targetDist = targetVec.distanceTo(robotWorldPos);
 
-  const MAX_REACH = 0.95; // Max physical reach of the 6-DOF arm (sum of link lengths)
-  const MIN_REACH = 0.10; // Avoid self-collision inside base cylinder
+  // Link lengths from URDF: 0.14+0.22+0.18+0.15+0.12+0.07 = 0.88m + base offsets
+  const MAX_REACH = 0.90;
+  const MIN_REACH = 0.05;
 
   if (targetDist > MAX_REACH) {
-    console.warn(`[moveTo] Target ${targetDist.toFixed(3)}m exceeds MAX_REACH ${MAX_REACH}m`);
+    console.warn(`[moveTo] Out of reach: ${targetDist.toFixed(3)}m > ${MAX_REACH}m`);
     return {
       success: false,
       reason: "out_of_bounds",
-      jointAngles: jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0),
+      jointAngles: jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0),
     };
   }
 
   if (targetDist < MIN_REACH) {
-    console.warn(`[moveTo] Target ${targetDist.toFixed(3)}m is below MIN_REACH ${MIN_REACH}m`);
+    console.warn(`[moveTo] Too close to base: ${targetDist.toFixed(3)}m < ${MIN_REACH}m`);
     return {
       success: false,
       reason: "unreachable",
-      jointAngles: jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0),
+      jointAngles: jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0),
     };
   }
 
-  // Ground plane check: robot coordinates have Z as vertical up axis in URDF base frame.
-  // Z must be >= -0.01m to prevent ground penetration.
-  if (target.z < -0.01) {
-    console.warn(`[moveTo] Target height z=${target.z.toFixed(3)}m is below ground`);
+  // Ground plane guard (Y < 0 in Three.js world = below floor)
+  if (target.y < -0.02) {
+    console.warn(`[moveTo] Below ground: y=${target.y.toFixed(3)}`);
     return {
       success: false,
       reason: "out_of_bounds",
-      jointAngles: jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0),
+      jointAngles: jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0),
     };
   }
 
-  // Save current joint angles so we can revert on failure
-  const originalAngles = jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0);
+  // Save original angles so we can revert on failure
+  const originalAngles = jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0);
 
-  // 2. Damped Least Squares (DLS) IK solver
-  const maxIterations = 100;
-  const tolerance = 0.005; // 5mm touch tolerance (CONTEXT.md §6.4)
-  const damping = 0.05; // Damping factor lambda
-  const maxStep = 0.03; // Max task-space error step size per iteration to prevent divergence
+  // ── 2. Damped Least Squares IK Solver ───────────────────────────────────
+  const maxIterations = 150;
+  const tolerance = 0.005;   // 5mm convergence threshold (CONTEXT.md §6.4)
+  const damping    = 0.08;   // DLS damping factor λ — higher = more stable, less agile
+  const maxStep    = 0.04;   // Max error step per iteration (prevents divergence)
 
   let converged = false;
 
+  // Target is already in THREE.js world space — no conversion needed
+  const targetWorld = new THREE.Vector3(target.x, target.y, target.z);
+
   for (let iter = 0; iter < maxIterations; iter++) {
-    // Ensure world coordinate matrices are updated
     robot.updateMatrixWorld(true);
 
-    // Get current end-effector position in world space
+    // Current EE position in world space
     const eePos = new THREE.Vector3();
     eeLink.getWorldPosition(eePos);
-
-    // Target is defined in robot local base frame. Convert to world space.
-    const targetWorld = robot.localToWorld(new THREE.Vector3(target.x, target.y, target.z));
 
     const error = new THREE.Vector3().subVectors(targetWorld, eePos);
     const errorNorm = error.length();
 
     if (errorNorm < tolerance) {
       converged = true;
-      console.log(`[moveTo] Converged in ${iter} iterations. Final error: ${(errorNorm * 1000).toFixed(2)}mm`);
+      console.log(`[moveTo] Converged in ${iter} iters — error: ${(errorNorm * 1000).toFixed(2)}mm`);
       break;
     }
 
-    // Error clamping to ensure small stable steps (prevent divergence/overshoot)
+    // Clamp step size to avoid overshoot and divergence
     if (errorNorm > maxStep) {
       error.normalize().multiplyScalar(maxStep);
     }
 
-    // Compute Jacobian matrix (3 x N) for translation
+    // ── Build Jacobian (3 × N), all in world space ──────────────────────
     const N = activeNames.length;
-    const J: THREE.Vector3[] = []; // Column vectors
+    const J: THREE.Vector3[] = [];
 
     for (let i = 0; i < N; i++) {
       const joint = robot.joints[activeNames[i]];
 
-      // Joint axis in world coordinates
+      // Joint axis in world space
       const jointAxis = new THREE.Vector3()
         .copy(joint.axis)
         .applyQuaternion(joint.getWorldQuaternion(new THREE.Quaternion()))
         .normalize();
 
-      // Joint position in world coordinates
+      // Joint origin in world space
       const jointPos = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
 
-      // J_i = axis x (eePos - jointPos)
+      // J_i = axis × (eePos − jointPos)
       const diff = new THREE.Vector3().subVectors(eePos, jointPos);
-      const col = new THREE.Vector3().crossVectors(jointAxis, diff);
-      J.push(col);
+      J.push(new THREE.Vector3().crossVectors(jointAxis, diff));
     }
 
-    // Solve J * dTheta = error using Damped Least Squares:
-    // dTheta = J^T * (J * J^T + lambda^2 * I)^-1 * error
-    // Compute A = J * J^T (3x3 matrix)
+    // ── Compute A = J·J^T + λ²·I  (3×3) ────────────────────────────────
     const A = [
       [0, 0, 0],
       [0, 0, 0],
       [0, 0, 0],
-    ];
+    ] as number[][];
 
     for (let r = 0; r < 3; r++) {
       for (const col of J) {
@@ -157,109 +156,80 @@ export function moveTo(target: Vector3Like): IKResult {
         A[r][1] += valR * col.y;
         A[r][2] += valR * col.z;
       }
-      // Add damping lambda^2 to diagonal
       A[r][r] += damping * damping;
     }
 
-    // Invert the 3x3 matrix A using Cramer's rule
+    // ── Invert A (3×3) via Cramer's rule ────────────────────────────────
     const det =
       A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) -
       A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) +
       A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
 
     if (Math.abs(det) < 1e-9) {
-      console.warn(`[moveTo] Singular Jacobian at iteration ${iter}. Aborting.`);
+      console.warn(`[moveTo] Singular Jacobian at iter ${iter} — aborting`);
       break;
     }
 
-    const invDet = 1.0 / det;
+    const d = 1.0 / det;
     const invA = [
-      [
-        (A[1][1] * A[2][2] - A[1][2] * A[2][1]) * invDet,
-        (A[0][2] * A[2][1] - A[0][1] * A[2][2]) * invDet,
-        (A[0][1] * A[1][2] - A[0][2] * A[1][1]) * invDet,
-      ],
-      [
-        (A[1][2] * A[2][0] - A[1][0] * A[2][2]) * invDet,
-        (A[0][0] * A[2][2] - A[0][2] * A[2][0]) * invDet,
-        (A[0][2] * A[1][0] - A[0][0] * A[1][2]) * invDet,
-      ],
-      [
-        (A[1][0] * A[2][1] - A[1][1] * A[2][0]) * invDet,
-        (A[0][1] * A[2][0] - A[0][0] * A[2][1]) * invDet,
-        (A[0][0] * A[1][1] - A[0][1] * A[1][0]) * invDet,
-      ],
+      [(A[1][1]*A[2][2]-A[1][2]*A[2][1])*d, (A[0][2]*A[2][1]-A[0][1]*A[2][2])*d, (A[0][1]*A[1][2]-A[0][2]*A[1][1])*d],
+      [(A[1][2]*A[2][0]-A[1][0]*A[2][2])*d, (A[0][0]*A[2][2]-A[0][2]*A[2][0])*d, (A[0][2]*A[1][0]-A[0][0]*A[1][2])*d],
+      [(A[1][0]*A[2][1]-A[1][1]*A[2][0])*d, (A[0][1]*A[2][0]-A[0][0]*A[2][1])*d, (A[0][0]*A[1][1]-A[0][1]*A[1][0])*d],
     ];
 
-    // Compute temp = (J * J^T + lambda^2 * I)^-1 * error
+    // ── temp = A⁻¹ · error ──────────────────────────────────────────────
     const temp = new THREE.Vector3(
-      invA[0][0] * error.x + invA[0][1] * error.y + invA[0][2] * error.z,
-      invA[1][0] * error.x + invA[1][1] * error.y + invA[1][2] * error.z,
-      invA[2][0] * error.x + invA[2][1] * error.y + invA[2][2] * error.z
+      invA[0][0]*error.x + invA[0][1]*error.y + invA[0][2]*error.z,
+      invA[1][0]*error.x + invA[1][1]*error.y + invA[1][2]*error.z,
+      invA[2][0]*error.x + invA[2][1]*error.y + invA[2][2]*error.z,
     );
 
-    // Multiply J^T by temp to get dTheta
+    // ── dTheta = J^T · temp  →  apply to each joint ─────────────────────
     for (let i = 0; i < N; i++) {
-      const col = J[i];
-      const dTheta = col.dot(temp);
-
+      const dTheta = J[i].dot(temp);
       const joint = robot.joints[activeNames[i]];
-      const nextAngle = ((joint.angle as number) ?? 0) + dTheta;
-      robot.setJointValue(activeNames[i], nextAngle);
+      const next = ((joint.angle as number) ?? 0) + dTheta;
+      robot.setJointValue(activeNames[i], next);
     }
   }
 
-  // 3. Post-solver verification
+  // ── 3. Post-convergence checks ───────────────────────────────────────────
   if (converged) {
     let limitsExceeded = false;
-    let failedJointIndex = -1;
+    let failedJoint = "";
 
-    for (let i = 0; i < jointNames.length; i++) {
-      const name = jointNames[i];
+    for (const name of jointNames) {
       const joint = robot.joints[name];
       if (joint && joint.jointType === "revolute") {
         const angle = (joint.angle as number) ?? 0;
         if (angle < joint.limit.lower || angle > joint.limit.upper) {
           limitsExceeded = true;
-          const nameMatch = name.match(/joint(\d+)/);
-          if (nameMatch) {
-            failedJointIndex = parseInt(nameMatch[1], 10);
-          } else {
-            failedJointIndex = i + 1;
-          }
-          console.warn(`[moveTo] Limit violation: joint ${name} angle=${angle.toFixed(3)} outside [${joint.limit.lower}, ${joint.limit.upper}]`);
+          failedJoint = name;
+          console.warn(`[moveTo] Limit violation: ${name} angle=${angle.toFixed(3)} outside [${joint.limit.lower.toFixed(3)}, ${joint.limit.upper.toFixed(3)}]`);
           break;
         }
       }
     }
 
     if (limitsExceeded) {
-      // Revert angles to original positions
-      jointNames.forEach((name, idx) => {
-        robot.setJointValue(name, originalAngles[idx]);
-      });
+      jointNames.forEach((n, i) => robot.setJointValue(n, originalAngles[i]));
       robot.updateMatrixWorld(true);
       return {
         success: false,
-        reason: `joint_${failedJointIndex}_out_of_limits`,
+        reason: `${failedJoint}_out_of_limits`,
         jointAngles: originalAngles,
       };
     }
 
-    // Success! Save current angles to store and return
-    const finalAngles = jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0);
+    const finalAngles = jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0);
     store.setCurrentAngles(finalAngles);
-    console.log("[moveTo] Success! Angles:", finalAngles);
-    return {
-      success: true,
-      jointAngles: finalAngles,
-    };
+    console.log("[moveTo] ✓ Success:", finalAngles.map(a => a.toFixed(3)));
+    return { success: true, jointAngles: finalAngles };
+
   } else {
-    // Revert angles on convergence failure
-    console.warn("[moveTo] Solver failed to converge. Reverting joint angles.");
-    jointNames.forEach((name, idx) => {
-      robot.setJointValue(name, originalAngles[idx]);
-    });
+    // Revert on failure
+    console.warn("[moveTo] ✗ Did not converge — reverting angles");
+    jointNames.forEach((n, i) => robot.setJointValue(n, originalAngles[i]));
     robot.updateMatrixWorld(true);
     return {
       success: false,

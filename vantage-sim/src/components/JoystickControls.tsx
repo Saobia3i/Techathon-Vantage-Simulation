@@ -14,21 +14,20 @@ type Props = {
 export function JoystickControls({ onStatusChange }: Props) {
   const { robot, stylusLinkName } = useRobotStore();
   const joystickRef = useRef<HTMLDivElement>(null);
-  const currentPos = useRef({ x: 0.12, y: 0.04, z: 0.3 });
-  const [zValue, setZValue] = useState(0.3);
+  const currentPos = useRef({ x: 0.12, y: 0.28, z: 0.3 });
+  const [yValue, setYValue] = useState(0.28); // world Y (height)
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(true);
   const [nippleReady, setNippleReady] = useState(false);
 
-  // Seed the ref from the real EE position if the robot is loaded
+  // Seed the ref from the real EE world position
   const getEePos = useCallback((): { x: number; y: number; z: number } | null => {
     if (!robot || !stylusLinkName) return null;
     const link = robot.links[stylusLinkName];
     if (!link) return null;
     const v = new THREE.Vector3();
     link.getWorldPosition(v);
-    const local = robot.worldToLocal(v);
-    return { x: local.x, y: local.y, z: local.z };
+    return { x: v.x, y: v.y, z: v.z }; // Return world coordinates directly
   }, [robot, stylusLinkName]);
 
   const doMove = useCallback(
@@ -50,7 +49,7 @@ export function JoystickControls({ onStatusChange }: Props) {
     [onStatusChange]
   );
 
-  // nipple.js real joystick for X/Y
+  // nipple.js real joystick for X/Z world plane (screen X/Y)
   useEffect(() => {
     if (!joystickRef.current) return;
     let manager: any = null;
@@ -73,10 +72,13 @@ export function JoystickControls({ onStatusChange }: Props) {
         const angle = data.angle.radian;
         const distance = data.distance / 1800; // speed scale
         const p = currentPos.current;
+        // Map 2D joystick angle to Three.js world X and Z plane:
+        // cos(angle) -> world X (right)
+        // -sin(angle) -> world Z (forward/away from camera)
         doMove({
           x: p.x + Math.cos(angle) * distance,
-          y: p.y + Math.sin(angle) * distance,
-          z: p.z,
+          y: p.y, // world Y is height, controlled by slider
+          z: p.z - Math.sin(angle) * distance,
         });
       });
     });
@@ -89,17 +91,17 @@ export function JoystickControls({ onStatusChange }: Props) {
     const ee = getEePos();
     if (ee) {
       currentPos.current = ee;
-      setZValue(ee.z);
+      setYValue(ee.y);
     }
   }, [getEePos]);
 
-  const handleZChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newZ = parseFloat(e.target.value);
-    setZValue(newZ);
-    doMove({ ...currentPos.current, z: newZ });
+  const handleYChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newY = parseFloat(e.target.value);
+    setYValue(newY);
+    doMove({ ...currentPos.current, y: newY });
   };
 
-  // D-pad nudge fallback
+  // D-pad nudge fallback mapping to world coordinates
   const nudge = (axis: "x" | "y" | "z", dir: number) => {
     const p = currentPos.current;
     doMove({
@@ -116,7 +118,7 @@ export function JoystickControls({ onStatusChange }: Props) {
           Joystick control surface
         </p>
         <p className="text-[11px] text-[--steel-600] font-sans mb-3">
-          Drag the joystick to move X/Y · use the Z slider for height.
+          Drag the joystick to move X/Z · use the height slider for Y.
           D-pad fallback available below.
         </p>
       </div>
@@ -124,7 +126,7 @@ export function JoystickControls({ onStatusChange }: Props) {
       <div className="flex gap-4 items-start">
         {/* nipple.js joystick zone */}
         <div className="flex flex-col items-center gap-2">
-          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans">X / Y Axis</p>
+          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans">X / Z plane</p>
           <div
             ref={joystickRef}
             className="relative rounded-full border-2 border-[--steel-400] bg-[--steel-100]"
@@ -138,17 +140,17 @@ export function JoystickControls({ onStatusChange }: Props) {
           </div>
         </div>
 
-        {/* Z Slider */}
+        {/* Height Slider (Vertical Y in world space) */}
         <div className="flex flex-col items-center gap-2 pt-5">
-          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans">Z Height</p>
+          <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans">Y Height</p>
           <div className="flex items-center gap-3" style={{ height: 140 }}>
             <input
               type="range"
               min="0.05"
-              max="0.65"
+              max="0.85"
               step="0.01"
-              value={zValue}
-              onChange={handleZChange}
+              value={yValue}
+              onChange={handleYChange}
               className="cursor-pointer"
               style={{
                 writingMode: "vertical-lr" as any,
@@ -158,40 +160,46 @@ export function JoystickControls({ onStatusChange }: Props) {
                 accentColor: "var(--copper)",
               }}
             />
-            <span className="text-[11px] font-mono text-[--walnut-700] w-10">{zValue.toFixed(2)}m</span>
+            <span className="text-[11px] font-mono text-[--walnut-700] w-10">{yValue.toFixed(2)}m</span>
           </div>
         </div>
 
-        {/* D-pad fallback */}
+        {/* D-pad fallback mapped to world coords */}
         <div className="flex flex-col items-center gap-1 pt-5">
           <p className="text-[10px] font-bold text-[--steel-600] uppercase tracking-wider font-sans mb-1">D-Pad</p>
           <button
-            onClick={() => nudge("y", 1)}
+            onClick={() => nudge("z", -1)}
             className="w-8 h-8 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center"
+            title="Move Forward (-Z)"
           >▲</button>
           <div className="flex gap-1">
             <button
               onClick={() => nudge("x", -1)}
               className="w-8 h-8 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center"
+              title="Move Left (-X)"
             >◀</button>
             <button
-              onClick={() => nudge("y", -1)}
+              onClick={() => nudge("z", 1)}
               className="w-8 h-8 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center"
+              title="Move Backward (+Z)"
             >▼</button>
             <button
               onClick={() => nudge("x", 1)}
               className="w-8 h-8 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-xs font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center"
+              title="Move Right (+X)"
             >▶</button>
           </div>
           <div className="flex gap-1 mt-1">
             <button
-              onClick={() => nudge("z", 1)}
+              onClick={() => nudge("y", 1)}
               className="w-8 h-8 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-[10px] font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center"
-            >+Z</button>
+              title="Move Up (+Y)"
+            >+Y</button>
             <button
-              onClick={() => nudge("z", -1)}
+              onClick={() => nudge("y", -1)}
               className="w-8 h-8 rounded border border-[--steel-400] bg-[--panel] hover:border-[--copper] hover:bg-white text-[10px] font-bold text-[--walnut-700] cursor-pointer transition-all flex items-center justify-center"
-            >-Z</button>
+              title="Move Down (-Y)"
+            >-Y</button>
           </div>
         </div>
       </div>

@@ -33,15 +33,14 @@ export async function renderKeyPanel(
     return;
   }
 
-  // Persist to shared store so IK solver and PIN sequencer can read positions
-  useRobotStore.getState().setKeyPositions(keyConfig);
-
   // Parent to robot root — coordinates are base-frame, not world-absolute
   const panelGroup = new THREE.Group();
   panelGroup.name = "key_panel";
   robot.add(panelGroup);
 
+  const worldKeyPositions: Record<string, { x: number; y: number; z: number }> = {};
   const entries = Object.entries(keyConfig);
+
   entries.forEach(([digit, pos], i) => {
     // Key geometry — 2 cm × 2 cm face, 1 cm deep (adjust if arm scale differs)
     const geometry = new THREE.BoxGeometry(0.02, 0.02, 0.01);
@@ -57,12 +56,33 @@ export async function renderKeyPanel(
     key.name = `key_${digit}`;
     key.userData.digit = digit;
 
-    // Label using a simple sprite (no canvas needed — digit is userData)
     panelGroup.add(key);
   });
 
+  // Force update matrix world of the robot and key panel hierarchy
+  robot.updateMatrixWorld(true);
+
+  // Retrieve exact world positions for use in the world-space moveTo() IK solver
+  panelGroup.children.forEach((child) => {
+    const keyMesh = child as THREE.Mesh;
+    const digit = keyMesh.userData.digit;
+    if (digit) {
+      const worldPos = new THREE.Vector3();
+      keyMesh.getWorldPosition(worldPos);
+      worldKeyPositions[digit] = {
+        x: worldPos.x,
+        y: worldPos.y,
+        z: worldPos.z,
+      };
+    }
+  });
+
+  // Persist the exact world key positions to the store for Dashboard/Voice/PIN controls
+  const store = useRobotStore.getState();
+  store.setKeyPositions(worldKeyPositions);
+  console.log("[renderKeyPanel] World-space key positions stored successfully:", worldKeyPositions);
+
   console.log(
-    `[renderKeyPanel] Rendered ${entries.length} keys parented to robot root.`,
-    keyConfig
+    `[renderKeyPanel] Rendered ${entries.length} keys parented to robot root.`
   );
 }

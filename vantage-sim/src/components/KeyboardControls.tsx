@@ -9,12 +9,12 @@ const STEP_NORMAL = 0.02;  // 2 cm
 const STEP_FINE   = 0.005; // 5 mm — teammate's Shift fine-step
 
 const KEY_BINDINGS = [
-  { key: "W", axis: "y" as const, dir: 1, label: "+Y (forward)" },
-  { key: "S", axis: "y" as const, dir: -1, label: "−Y (back)" },
-  { key: "A", axis: "x" as const, dir: -1, label: "−X (left)" },
-  { key: "D", axis: "x" as const, dir: 1, label: "+X (right)" },
-  { key: "Q", axis: "z" as const, dir: 1, label: "+Z (up)" },
-  { key: "E", axis: "z" as const, dir: -1, label: "−Z (down)" },
+  { key: "W", axis: "z" as const, dir: -1, label: "Forward (−Z)" },
+  { key: "S", axis: "z" as const, dir: 1,  label: "Backward (+Z)" },
+  { key: "A", axis: "x" as const, dir: -1, label: "Left (−X)" },
+  { key: "D", axis: "x" as const, dir: 1,  label: "Right (+X)" },
+  { key: "Q", axis: "y" as const, dir: 1,  label: "Up (+Y)" },
+  { key: "E", axis: "y" as const, dir: -1, label: "Down (−Y)" },
 ];
 
 export function KeyboardControls({
@@ -36,7 +36,7 @@ export function KeyboardControls({
     if (!link) return null;
     const v = new THREE.Vector3();
     link.getWorldPosition(v);
-    return robot.worldToLocal(v);
+    return v; // Return world position directly (since moveTo expects world coordinates)
   }, [robot, stylusLinkName]);
 
   const handleNudge = useCallback(
