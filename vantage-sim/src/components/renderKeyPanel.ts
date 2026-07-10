@@ -49,11 +49,11 @@ function makeDigitLabel(digit: string) {
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: true,
-    depthWrite: false,
+    depthWrite: true,
+    depthTest: true,
     side: THREE.DoubleSide,
   });
   const label = new THREE.Mesh(new THREE.PlaneGeometry(KEY_FACE_SIZE * 0.82, KEY_FACE_SIZE * 0.82), material);
-  label.rotation.x = Math.PI / 2;
   label.renderOrder = 10;
   return label;
 }
@@ -141,8 +141,8 @@ export async function renderKeyPanel(
 
     const label = makeDigitLabel(digit);
     if (label) {
-      // Place label flat on top of the key face (Y = centerY + eps)
-      label.position.set(pos.x, centerY + 0.0005, pos.z);
+      // Place label flat on top of the key face (Y = centerY + 1.2mm) to prevent z-fighting
+      label.position.set(pos.x, centerY + 0.0012, pos.z);
       // Rotate label to lay flat on the floor (XZ plane) facing upwards
       label.rotation.x = -Math.PI / 2;
       panelGroup.add(label);
