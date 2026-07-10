@@ -101,15 +101,16 @@ export function moveTo(target: Vector3Like): IKResult {
   }
 
   // ── 2. Damped Least Squares IK Solver ───────────────────────────────────
-  const maxIterations = 150;
+  const maxIterations = 250;
   const tolerance = 0.005;   // 5mm convergence threshold (CONTEXT.md §6.4)
-  const damping    = 0.08;   // DLS damping factor λ — higher = more stable, less agile
+  const damping    = 0.03;   // DLS damping factor λ — lower = more agile, higher = more stable
   const maxStep    = 0.04;   // Max error step per iteration (prevents divergence)
 
   let converged = false;
 
   // Target is already in THREE.js world space — no conversion needed
   const targetWorld = new THREE.Vector3(target.x, target.y, target.z);
+  let finalEePos = new THREE.Vector3();
 
   for (let iter = 0; iter < maxIterations; iter++) {
     robot.updateMatrixWorld(true);
@@ -117,6 +118,7 @@ export function moveTo(target: Vector3Like): IKResult {
     // Current EE position in world space
     const eePos = new THREE.Vector3();
     eeLink.getWorldPosition(eePos);
+    finalEePos.copy(eePos);
 
     const error = new THREE.Vector3().subVectors(targetWorld, eePos);
     const errorNorm = error.length();
@@ -199,7 +201,13 @@ export function moveTo(target: Vector3Like): IKResult {
     for (let i = 0; i < N; i++) {
       const dTheta = J[i].dot(temp);
       const joint = robot.joints[activeNames[i]];
-      const next = ((joint.angle as number) ?? 0) + dTheta;
+      let next = ((joint.angle as number) ?? 0) + dTheta;
+
+      // Clamp to joint limits during each solver iteration (projection-based IK)
+      if (joint.jointType === "revolute" && joint.limit) {
+        next = Math.max(joint.limit.lower, Math.min(joint.limit.upper, next));
+      }
+
       robot.setJointValue(activeNames[i], next);
     }
   }
@@ -239,7 +247,8 @@ export function moveTo(target: Vector3Like): IKResult {
 
   } else {
     // Revert on failure
-    console.warn("[moveTo] ✗ Did not converge — reverting angles");
+    const finalError = targetWorld.distanceTo(finalEePos);
+    console.warn(`[moveTo] ✗ Did not converge — Target: (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)}), Final EE: (${finalEePos.x.toFixed(3)}, ${finalEePos.y.toFixed(3)}, ${finalEePos.z.toFixed(3)}), Error: ${(finalError * 1000).toFixed(2)}mm`);
     jointNames.forEach((n, i) => robot.setJointValue(n, originalAngles[i]));
     robot.updateMatrixWorld(true);
     return {
