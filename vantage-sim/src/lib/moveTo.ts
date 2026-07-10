@@ -4,7 +4,7 @@ import type { IKEquationReport, Vector3Like, IKResult } from "@/types/robot";
 
 const MAX_REACH = 1.0;
 const MIN_REACH = 0.05;
-const GROUND_MIN_Y = -0.02;
+const GROUND_MIN_Y = 0.0;
 const MAX_ITERATIONS = 250;
 const TOLERANCE = 0.005;
 const DAMPING = 0.03;
@@ -19,11 +19,56 @@ function finish(
   success: boolean,
   jointAngles: number[],
   reason?: string,
-): IKResult {
+  ): IKResult {
   report.success = success;
   report.reason = reason;
   useRobotStore.getState().setLastIKReport(report);
   return success ? { success, jointAngles, report } : { success, reason, jointAngles, report };
+}
+
+export function checkCollision(robot: any, activeNames: string[], eeLink: any): { collision: boolean; reason?: string } {
+  const points: THREE.Vector3[] = [];
+
+  // Add all joints from joint1 to joint6 in kinematic order
+  const chain = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"];
+  for (const name of chain) {
+    const joint = robot.joints[name];
+    if (joint) {
+      const pos = new THREE.Vector3();
+      joint.getWorldPosition(pos);
+      points.push(pos);
+    }
+  }
+
+  // Add end-effector tip (actual physical tip lies at local Z=0.04m)
+  const eePos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
+  points.push(eePos);
+
+  // Sample points along the segment connecting adjacent joints/links to check
+  // for ground and board collisions.
+  for (let i = 0; i < points.length - 1; i++) {
+    const start = points[i];
+    const end = points[i + 1];
+
+    // Sample 8 intermediate points along each link cylinder segment
+    for (let k = 0; k <= 7; k++) {
+      const t = k / 7;
+      const x = (1 - t) * start.x + t * end.x;
+      const y = (1 - t) * start.y + t * end.y;
+      const z = (1 - t) * start.z + t * end.z;
+
+      // Board region: x in [0.06, 0.20] and z in [0.24, 0.35]
+      const insideBoard = x >= 0.06 && x <= 0.20 && z >= 0.24 && z <= 0.35;
+      const minAllowedY = insideBoard ? 0.038 : -0.001;
+
+      // Allow 1mm tolerance
+      if (y < minAllowedY) {
+        return { collision: true, reason: insideBoard ? "board_collision" : "ground_collision" };
+      }
+    }
+  }
+
+  return { collision: false };
 }
 
 /**
@@ -114,15 +159,20 @@ export function moveTo(target: Vector3Like): IKResult {
     return finish(report, false, currentJointAngles(), "unreachable");
   }
 
+  const insideBoard = target.x >= 0.06 && target.x <= 0.20 && target.z >= 0.24 && target.z <= 0.35;
+  const minTargetY = insideBoard ? 0.038 : GROUND_MIN_Y;
+
   report.steps.push({
-    label: "Ground guard",
-    equation: `target.y >= ${GROUND_MIN_Y}`,
-    output: `${fmt(target.y)} >= ${GROUND_MIN_Y} is ${target.y >= GROUND_MIN_Y}`,
-    why: "The stylus is not allowed to target a point below the floor plane.",
+    label: "Ground/Board guard",
+    equation: `target.y >= ${minTargetY.toFixed(3)}`,
+    output: `${fmt(target.y)} >= ${minTargetY.toFixed(3)} is ${target.y >= minTargetY}`,
+    why: insideBoard
+      ? "Target is within the key board region; height must be above the board surface."
+      : "Target height must remain above the ground plane.",
   });
 
-  if (target.y < GROUND_MIN_Y) {
-    console.warn(`[moveTo] Below ground: y=${target.y.toFixed(3)}`);
+  if (target.y < minTargetY) {
+    console.warn(`[moveTo] Target below safety boundary: y=${target.y.toFixed(3)} (insideBoard=${insideBoard})`);
     return finish(report, false, currentJointAngles(), "out_of_bounds");
   }
 
@@ -156,8 +206,7 @@ export function moveTo(target: Vector3Like): IKResult {
     iterationsUsed = iter + 1;
     robot.updateMatrixWorld(true);
 
-    const eePos = new THREE.Vector3();
-    eeLink.getWorldPosition(eePos);
+    const eePos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
     finalEePos.copy(eePos);
 
     const error = new THREE.Vector3().subVectors(targetWorld, eePos);
@@ -246,7 +295,7 @@ export function moveTo(target: Vector3Like): IKResult {
 
   report.iterations = iterationsUsed;
   robot.updateMatrixWorld(true);
-  eeLink.getWorldPosition(finalEePos);
+  finalEePos.copy(eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04)));
   const finalError = targetWorld.distanceTo(finalEePos);
   const finalConverged = converged || finalError < TOLERANCE;
   report.finalWorld = { x: finalEePos.x, y: finalEePos.y, z: finalEePos.z };
@@ -301,6 +350,15 @@ export function moveTo(target: Vector3Like): IKResult {
           return finish(report, false, originalAngles, `${name}_out_of_limits`);
         }
       }
+    }
+
+    // Verify all joints and the end-effector do not collide with ground or board
+    const coll = checkCollision(robot, activeNames, eeLink);
+    if (coll.collision) {
+      console.warn(`[moveTo] Collision detected during movement verification: ${coll.reason}`);
+      jointNames.forEach((n, i) => robot.setJointValue(n, originalAngles[i]));
+      robot.updateMatrixWorld(true);
+      return finish(report, false, originalAngles, "out_of_bounds");
     }
 
     const finalAngles = currentJointAngles();

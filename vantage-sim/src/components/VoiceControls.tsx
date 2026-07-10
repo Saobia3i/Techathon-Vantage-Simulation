@@ -2,7 +2,7 @@
 
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
 import { useRobotStore } from "@/state/robotStore";
-import { moveTo } from "@/lib/moveTo";
+import { moveToSmooth as moveTo } from "@/lib/animateArm";
 import { useState } from "react";
 
 // Simulated PIN-key voice command shortcuts (keep existing feature)

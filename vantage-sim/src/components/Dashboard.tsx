@@ -3,7 +3,7 @@
 import { useRobotStore } from "@/state/robotStore";
 import * as THREE from "three";
 import { useState } from "react";
-import { moveTo } from "@/lib/moveTo";
+import { moveToSmooth as moveTo } from "@/lib/animateArm";
 
 import { DebugControls } from "@/components/DebugControls";
 

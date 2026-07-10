@@ -1,7 +1,7 @@
 "use client";
 
 import { useRobotStore } from "@/state/robotStore";
-import { moveTo } from "@/lib/moveTo";
+import { moveToSmooth as moveTo } from "@/lib/animateArm";
 import * as THREE from "three";
 import { useState, useEffect, useCallback, useRef } from "react";
 

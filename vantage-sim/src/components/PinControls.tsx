@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { moveTo } from "../lib/moveTo";
+import { moveToSmooth as moveTo } from "../lib/animateArm";
 import { useRobotStore } from "../state/robotStore";
 
 // TypeScript-এর জন্য Props ডিফাইন করা হলো (যাতে page.tsx থেকে আসা ডেটা রিসিভ করতে পারে)
@@ -51,14 +51,14 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
       const hoverZ = targetPos.z - 0.05;
 
       moveTo({ x: targetPos.x, y: targetPos.y, z: hoverZ });
-      await delay(600);
+      await delay(700); // wait for smooth animation to settle before pressing
 
       updateStatus(`Pressing digit: ${digit}`);
       moveTo({ x: targetPos.x, y: targetPos.y, z: targetPos.z });
-      await delay(400);
+      await delay(500); // dwell time — arm touches key
 
       moveTo({ x: targetPos.x, y: targetPos.y, z: hoverZ });
-      await delay(500);
+      await delay(600); // retract before next key
     }
 
     updateStatus("Sequence complete! Returning to home.");
@@ -68,11 +68,11 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
   };
 
   return (
-    <div className="p-4 bg-white border rounded-lg shadow-sm">
-      <h3 className="font-bold text-gray-800 mb-4">Autonomous PIN Entry 🤖</h3>
+    <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+      <h3 className="font-bold text-gray-900 mb-4">Autonomous PIN Entry 🤖</h3>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-800 mb-1">
             Enter PIN (1-6 only)
           </label>
           <input
@@ -82,7 +82,7 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
               setPin(e.target.value.replace(/[^1-6]/g, "").slice(0, 6))
             }
             disabled={isExecuting}
-            className="w-full border border-gray-300 rounded-md shadow-sm p-2"
+            className="w-full border border-gray-300 rounded-md shadow-sm p-2 text-black bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-base"
             placeholder="e.g. 123456"
           />
         </div>
@@ -95,8 +95,8 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
         >
           {isExecuting ? "Executing..." : "Submit PIN"}
         </button>
-        <div className="mt-4 p-3 bg-slate-50 border rounded-md">
-          <p className="text-sm text-slate-600 font-mono">
+        <div className="mt-4 p-3 bg-slate-50 border border-gray-200 rounded-md">
+          <p className="text-sm text-gray-800 font-mono">
             <strong>Status:</strong> {status}
           </p>
         </div>

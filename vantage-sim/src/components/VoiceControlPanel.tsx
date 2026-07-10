@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import { useRobotStore } from "@/state/robotStore";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
-import { moveTo } from "@/lib/moveTo";
+import { moveToSmooth as moveTo } from "@/lib/animateArm";
 
 type VoiceAction =
   | { type: "move_delta"; dx?: number; dy?: number; dz?: number }

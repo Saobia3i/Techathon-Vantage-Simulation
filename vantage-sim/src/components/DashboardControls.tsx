@@ -1,7 +1,8 @@
 "use client";
 
 import { useRobotStore } from "@/state/robotStore";
-import { moveTo } from "@/lib/moveTo";
+import { moveToSmooth as moveTo } from "@/lib/animateArm";
+import { checkCollision } from "@/lib/moveTo";
 import { useState } from "react";
 
 export function DashboardControls({
@@ -33,23 +34,53 @@ export function DashboardControls({
     }
   };
 
+  // nudgeJoint modifies the joint angle directly in joint-space, clamping to URDF limits
+  // and performing a collision check on the resulting state before accepting.
   const nudgeJoint = (index: number, delta: number) => {
     if (!robot) return;
     const name = jointNames[index];
     const joint = robot.joints[name];
     if (!joint) return;
 
-    const current = (joint.angle as number) ?? 0;
-    const targetVal = current + delta;
-    
+    const stylusLinkName = useRobotStore.getState().stylusLinkName || "stylus_tip";
+    const eeLink = robot.links[stylusLinkName];
+    if (!eeLink) return;
+
+    const currentVal = (joint.angle as number) ?? 0;
+    let targetVal = currentVal + delta;
+
+    // 1. Clamp to joint limits
+    if (joint.jointType === "revolute" && joint.limit) {
+      targetVal = Math.max(joint.limit.lower, Math.min(joint.limit.upper, targetVal));
+    }
+
+    if (Math.abs(targetVal - currentVal) < 1e-4) {
+      onStatusChange?.(`Nudge blocked: ${name} is at its physical limit`, false, "limit_clamped");
+      return;
+    }
+
+    // 2. Temporarily set joint value for collision check
     robot.setJointValue(name, targetVal);
     robot.updateMatrixWorld(true);
-    
-    // Trigger state sync
-    const angles = jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0);
-    useRobotStore.getState().setCurrentAngles(angles);
 
-    onStatusChange?.(`Nudged ${name} to ${targetVal.toFixed(2)} rad`, true);
+    // 3. Collision check
+    const activeNames = jointNames.filter((n) => {
+      const j = robot.joints[n];
+      return j && (j.jointType === "revolute" || j.jointType === "continuous");
+    });
+    const coll = checkCollision(robot, activeNames, eeLink);
+
+    if (coll.collision) {
+      // Revert change
+      robot.setJointValue(name, currentVal);
+      robot.updateMatrixWorld(true);
+      onStatusChange?.(`Nudge blocked: collision detected (${coll.reason})`, false, coll.reason);
+    } else {
+      // Accept change and sync store state
+      const angles = jointNames.map((n) => (robot.joints[n]?.angle as number) ?? 0);
+      useRobotStore.getState().setCurrentAngles(angles);
+      onStatusChange?.(`Nudged ${name} to ${targetVal.toFixed(2)} rad`, true);
+    }
   };
 
   return (

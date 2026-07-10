@@ -27,8 +27,7 @@ export const useKeyboardControls = () => {
 
       // 3D scene theke ashol live position niye asha hocche
       robot.updateMatrixWorld(true);
-      const pos = new THREE.Vector3();
-      eeLink.getWorldPosition(pos);
+      const pos = eeLink.localToWorld(new THREE.Vector3(0, 0, 0.04));
 
       let { x, y, z } = currentTarget.current || {
         x: pos.x,

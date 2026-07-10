@@ -7,7 +7,8 @@ import { DashboardControls } from "@/components/DashboardControls";
 import { JoystickControls } from "@/components/JoystickControls";
 import { KeyboardControls } from "@/components/KeyboardControls";
 import VoiceControlPanel from "@/components/VoiceControlPanel";
-import  PinControls  from "@/components/PinControls";
+import PinControls from "@/components/PinControls";
+import { JointPreviewOverlay } from "@/components/JointPreviewOverlay";
 
 type SurfaceTab = "dashboard" | "joystick" | "keyboard" | "voice" | "pin";
 
@@ -194,12 +195,13 @@ export default function Home() {
                 className="scene-grid-bg relative overflow-hidden"
                 style={{
                   width: "100%",
-                  height: "420px",
+                  height: "540px",
                   border: "1px solid var(--steel-200)",
                   borderRadius: "3px",
                 }}
               >
                 <SceneWrapper />
+                <JointPreviewOverlay />
               </div>
 
               <p style={{ fontSize: "12px", color: "var(--steel-600)", marginTop: "10px", marginBottom: 0 }}>

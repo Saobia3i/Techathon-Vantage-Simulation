@@ -146,19 +146,26 @@ export function RobotScene() {
     controls.update();
 
     // ── Lighting (3-Point Setup) ──────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     
-    const keyLight = new THREE.DirectionalLight(0xfff8ee, 1.25);
-    keyLight.position.set(3, 4, 2);
+    const keyLight = new THREE.DirectionalLight(0xfff8ee, 1.35);
+    keyLight.position.set(2, 3, 2);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
     keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.bias = -0.0002;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 8;
+    keyLight.shadow.camera.left = -1.2;
+    keyLight.shadow.camera.right = 1.2;
+    keyLight.shadow.camera.top = 1.2;
+    keyLight.shadow.camera.bottom = -1.2;
     
-    const fillLight = new THREE.DirectionalLight(0xeef5ff, 0.5);
-    fillLight.position.set(-3, 2, -2);
+    const fillLight = new THREE.DirectionalLight(0xeef5ff, 0.6);
+    fillLight.position.set(-2, 2, -1);
     
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    rimLight.position.set(0, 2, -4);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    rimLight.position.set(0, 3, -3);
     
     scene.add(keyLight, fillLight, rimLight);
 
@@ -167,8 +174,8 @@ export function RobotScene() {
       new THREE.PlaneGeometry(6, 6),
       new THREE.MeshStandardMaterial({
         color: 0xd8d5cd, // matches --steel-200
-        roughness: 0.5,
-        metalness: 0.1,
+        roughness: 0.45,
+        metalness: 0.15,
       })
     );
     ground.rotation.x = -Math.PI / 2;
@@ -179,6 +186,15 @@ export function RobotScene() {
     const grid = new THREE.GridHelper(4, 20, 0xa9a69c, 0xd8d5cd);
     grid.position.y = 0.001;
     scene.add(grid);
+
+    // Coordinate axis helper at base origin (Red = X, Green = Y, Blue = Z)
+    const axesHelper = new THREE.AxesHelper(0.18);
+    axesHelper.position.set(0, 0.002, 0);
+    if (axesHelper.material) {
+      (axesHelper.material as any).depthWrite = true;
+      (axesHelper.material as any).depthTest = true;
+    }
+    scene.add(axesHelper);
 
     // ── Load URDF ─────────────────────────────────────────────────────────
     const loader = new URDFLoader();
