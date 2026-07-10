@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { moveToSmooth as moveTo } from "../lib/animateArm";
+import { useRobotStore } from "../state/robotStore";
+import * as THREE from "three";
 
-const INITIAL_POS = { x: 0.12, y: 0.04, z: 0.3 };
+const INITIAL_POS = { x: 0.12, y: 0.28, z: 0.3 };
 
 export default function JoystickControl() {
   const joystickRef = useRef<HTMLDivElement>(null);
-  const currentPos = useRef(INITIAL_POS);
-  const [zValue, setZValue] = useState(INITIAL_POS.z);
+  const [yValue, setYValue] = useState(INITIAL_POS.y);
 
   useEffect(() => {
     if (!joystickRef.current) return;
@@ -20,6 +21,9 @@ export default function JoystickControl() {
       // মডিউলটি সঠিকভাবে এক্সট্রাক্ট করা
       const nipple = nipplejsModule.default || nipplejsModule;
 
+      const JOYSTICK_RADIUS = 50; // half of size:100
+      const MAX_SPEED = 0.018;    // max meters per event at full deflection
+
       // nipple.create ব্যবহার করে জয়স্টিক ইনিশিয়ালাইজ করা
       manager = nipple.create({
         zone: joystickRef.current as HTMLElement,
@@ -29,18 +33,34 @@ export default function JoystickControl() {
         size: 100,
       });
 
-      manager.on("move", (evt: any, data: any) => {
+      manager.on("move", (_evt: any, data: any) => {
         // সেফটি চেক: angle না পেলে লজিক রান করবে না
         if (!data || !data.angle) return;
 
+        // Read LIVE EE world position every event to prevent drift
+        const store = useRobotStore.getState();
+        const robot = store.robot;
+        const linkName = store.stylusLinkName || "stylus_tip";
+        if (!robot) return;
+        const eeLink = robot.links[linkName];
+        if (!eeLink) return;
+        robot.updateMatrixWorld(true);
+        const v = new THREE.Vector3();
+        eeLink.getWorldPosition(v);
+
         const angle = data.angle.radian;
-        const distance = data.distance / 2000; // স্পিড কন্ট্রোল
+        // Normalize distance 0→1
+        const ratio = Math.min(data.distance / JOYSTICK_RADIUS, 1.0);
+        const speed = ratio * MAX_SPEED;
 
-        const newX = currentPos.current.x + Math.cos(angle) * distance;
-        const newY = currentPos.current.y + Math.sin(angle) * distance;
-
-        currentPos.current = { x: newX, y: newY, z: currentPos.current.z };
-        moveTo(currentPos.current);
+        // Correct 3D mapping:
+        //   nipplejs angle 0 = right → +X in Three.js world
+        //   nipplejs angle 90 = up   → -Z in Three.js world (forward)
+        moveTo({
+          x: v.x + Math.cos(angle) * speed,
+          y: v.y,   // Y (height) controlled by slider
+          z: v.z - Math.sin(angle) * speed,
+        });
       });
     });
 
@@ -52,17 +72,28 @@ export default function JoystickControl() {
     };
   }, []);
 
-  const handleZChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newZ = parseFloat(e.target.value);
-    setZValue(newZ);
-    currentPos.current.z = newZ;
-    moveTo(currentPos.current);
+  const handleYChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newY = parseFloat(e.target.value);
+    setYValue(newY);
+
+    // Read live EE position and update only Y
+    const store = useRobotStore.getState();
+    const robot = store.robot;
+    const linkName = store.stylusLinkName || "stylus_tip";
+    if (!robot) return;
+    const eeLink = robot.links[linkName];
+    if (!eeLink) return;
+    robot.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    eeLink.getWorldPosition(v);
+    moveTo({ x: v.x, y: newY, z: v.z });
   };
 
   return (
     <div className="p-4 bg-white border rounded-lg shadow-sm flex items-center justify-between gap-6">
       <div className="flex-1 text-center">
-        <h3 className="font-bold text-gray-800 mb-2">Joystick (X/Y) 🕹️</h3>
+        <h3 className="font-bold text-gray-800 mb-2">Joystick (X/Z) 🕹️</h3>
+        <p className="text-xs text-gray-500 mb-1">Drag to move X / Z plane</p>
         {/* জয়স্টিক রেন্ডার হওয়ার জায়গা */}
         <div
           className="relative w-32 h-32 bg-gray-100 rounded-full mx-auto"
@@ -71,14 +102,14 @@ export default function JoystickControl() {
       </div>
 
       <div className="flex flex-col items-center">
-        <h3 className="font-bold text-gray-800 mb-2">Height (Z)</h3>
+        <h3 className="font-bold text-gray-800 mb-2">Height (Y)</h3>
         <input
           type="range"
-          min="0.1"
-          max="0.6"
+          min="0.05"
+          max="0.85"
           step="0.01"
-          value={zValue}
-          onChange={handleZChange}
+          value={yValue}
+          onChange={handleYChange}
           className="w-32 accent-blue-500 cursor-pointer"
           style={{
             transform: "rotate(-90deg)",
@@ -86,6 +117,7 @@ export default function JoystickControl() {
             marginBottom: "40px",
           }}
         />
+        <span className="text-xs font-mono text-gray-600">{yValue.toFixed(2)}m</span>
       </div>
     </div>
   );

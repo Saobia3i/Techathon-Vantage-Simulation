@@ -67,18 +67,34 @@ export function JoystickControls({ onStatusChange }: Props) {
       });
       setNippleReady(true);
 
+      const JOYSTICK_RADIUS = 55; // half of size:110
+      const MAX_SPEED = 0.018;    // max meters per event at full deflection
+
       manager.on("move", (_: any, data: any) => {
         if (!data?.angle) return;
+
+        // Read LIVE EE world position every event to prevent drift
+        const store = useRobotStore.getState();
+        const robot = store.robot;
+        const name = store.stylusLinkName || "stylus_tip";
+        if (!robot) return;
+        const eeLink = robot.links[name];
+        if (!eeLink) return;
+        robot.updateMatrixWorld(true);
+        const v = new THREE.Vector3();
+        eeLink.getWorldPosition(v);
+
         const angle = data.angle.radian;
-        const distance = data.distance / 1800; // speed scale
-        const p = currentPos.current;
-        // Map 2D joystick angle to Three.js world X and Z plane:
-        // cos(angle) -> world X (right)
-        // -sin(angle) -> world Z (forward/away from camera)
+        // Normalize distance: 0 (center) to 1 (full deflection)
+        const ratio = Math.min(data.distance / JOYSTICK_RADIUS, 1.0);
+        const speed = ratio * MAX_SPEED;
+
+        // Map 2D joystick polar angle to Three.js world X/Z:
+        //   nipplejs angle 0 = right (+X), 90 = up (-Z in Three.js)
         doMove({
-          x: p.x + Math.cos(angle) * distance,
-          y: p.y, // world Y is height, controlled by slider
-          z: p.z - Math.sin(angle) * distance,
+          x: v.x + Math.cos(angle) * speed,
+          y: v.y,           // Y height controlled by slider
+          z: v.z - Math.sin(angle) * speed,
         });
       });
     });
