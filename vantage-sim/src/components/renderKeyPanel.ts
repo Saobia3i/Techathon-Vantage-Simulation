@@ -1,39 +1,53 @@
-/**
- * renderKeyPanel — places 6 coloured key boxes in the Three.js scene.
- *
- * Keys are parented to the robot's root object (NOT the scene root) so they
- * inherit the arm's base-frame transform. Coordinates in key.config.json are
- * relative to the arm base frame — CONTEXT.md §6.3.
- */
 import * as THREE from "three";
 import type { URDFRobot } from "urdf-loader";
 import { useRobotStore } from "@/state/robotStore";
 
 const KEY_COLORS = [
-  0xff4d6d, // key 1 — red-pink
-  0xff8c42, // key 2 — orange
-  0xffe14d, // key 3 — yellow
-  0x4dffb8, // key 4 — mint
-  0x4dc3ff, // key 5 — sky blue
-  0xb44dff, // key 6 — violet
+  0xff4d6d,
+  0xff8c42,
+  0xffe14d,
+  0x4dffb8,
+  0x4dc3ff,
+  0xb44dff,
 ];
+
+const KEY_SIZE = 0.038;
+const KEY_DEPTH = 0.014;
+const TARGET_SURFACE_OFFSET = 0.018;
+
+const DEFAULT_KEY_CONFIG: Record<string, { x: number; y: number; z: number }> = {
+  "1": { x: 0.34, y: -0.20, z: 0.24 },
+  "2": { x: 0.40, y: -0.20, z: 0.24 },
+  "3": { x: 0.46, y: -0.20, z: 0.24 },
+  "4": { x: 0.34, y: -0.20, z: 0.30 },
+  "5": { x: 0.40, y: -0.20, z: 0.30 },
+  "6": { x: 0.46, y: -0.20, z: 0.30 },
+};
 
 export async function renderKeyPanel(
   scene: THREE.Scene,
   robot: URDFRobot
 ): Promise<void> {
-  let keyConfig: Record<string, { x: number; y: number; z: number }>;
+  let keyConfig = DEFAULT_KEY_CONFIG;
 
   try {
-    const res = await fetch("/robot/key.config.json");
+    const res = await fetch(`/robot/key.config.json?v=${Date.now()}`, {
+      cache: "no-store",
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    keyConfig = await res.json();
+    const loadedConfig = await res.json();
+    if (loadedConfig && Object.keys(loadedConfig).length === 6) {
+      keyConfig = loadedConfig;
+    }
   } catch (err) {
-    console.error("[renderKeyPanel] Failed to load key.config.json:", err);
-    return;
+    console.warn("[renderKeyPanel] Using built-in key layout because key.config.json failed:", err);
   }
 
-  // Parent to robot root — coordinates are base-frame, not world-absolute
+  const existingPanel = robot.getObjectByName("key_panel");
+  if (existingPanel) {
+    robot.remove(existingPanel);
+  }
+
   const panelGroup = new THREE.Group();
   panelGroup.name = "key_panel";
   robot.add(panelGroup);
@@ -42,8 +56,7 @@ export async function renderKeyPanel(
   const entries = Object.entries(keyConfig);
 
   entries.forEach(([digit, pos], i) => {
-    // Key geometry — 2 cm × 2 cm face, 1 cm deep (adjust if arm scale differs)
-    const geometry = new THREE.BoxGeometry(0.02, 0.02, 0.01);
+    const geometry = new THREE.BoxGeometry(KEY_SIZE, KEY_SIZE, KEY_DEPTH);
     const material = new THREE.MeshStandardMaterial({
       color: KEY_COLORS[i % KEY_COLORS.length],
       roughness: 0.3,
@@ -51,38 +64,37 @@ export async function renderKeyPanel(
       emissive: KEY_COLORS[i % KEY_COLORS.length],
       emissiveIntensity: 0.15,
     });
+
     const key = new THREE.Mesh(geometry, material);
     key.position.set(pos.x, pos.y, pos.z);
+    key.rotation.x = Math.PI / 2;
     key.name = `key_${digit}`;
     key.userData.digit = digit;
-
     panelGroup.add(key);
   });
 
-  // Force update matrix world of the robot and key panel hierarchy
   robot.updateMatrixWorld(true);
 
-  // Retrieve exact world positions for use in the world-space moveTo() IK solver
   panelGroup.children.forEach((child) => {
     const keyMesh = child as THREE.Mesh;
     const digit = keyMesh.userData.digit;
-    if (digit) {
-      const worldPos = new THREE.Vector3();
-      keyMesh.getWorldPosition(worldPos);
-      worldKeyPositions[digit] = {
-        x: worldPos.x,
-        y: worldPos.y,
-        z: worldPos.z,
-      };
-    }
+    if (!digit) return;
+
+    const worldPos = new THREE.Vector3();
+    keyMesh.getWorldPosition(worldPos);
+
+    const targetLocal = keyMesh.position.clone();
+    targetLocal.y -= TARGET_SURFACE_OFFSET;
+    const targetWorld = panelGroup.localToWorld(targetLocal);
+
+    worldKeyPositions[digit] = {
+      x: targetWorld.x,
+      y: targetWorld.y,
+      z: targetWorld.z,
+    };
   });
 
-  // Persist the exact world key positions to the store for Dashboard/Voice/PIN controls
-  const store = useRobotStore.getState();
-  store.setKeyPositions(worldKeyPositions);
-  console.log("[renderKeyPanel] World-space key positions stored successfully:", worldKeyPositions);
-
-  console.log(
-    `[renderKeyPanel] Rendered ${entries.length} keys parented to robot root.`
-  );
+  useRobotStore.getState().setKeyPositions(worldKeyPositions);
+  console.log("[renderKeyPanel] World-space key positions stored:", worldKeyPositions);
+  console.log(`[renderKeyPanel] Rendered ${entries.length} keys on reachable keypad.`);
 }
