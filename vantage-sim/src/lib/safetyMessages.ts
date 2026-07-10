@@ -22,6 +22,10 @@ export function formatSafetyReason(reason?: string) {
       return "Agent rejected the command";
     case "command_not_recognized":
       return "Invalid: voice command was not recognized";
+    case "agentic_empty_plan":
+      return "Agent returned no executable motion plan";
+    case "agentic_voice_failed":
+      return "Agentic voice request failed";
     case undefined:
     case "":
       return "Invalid command";

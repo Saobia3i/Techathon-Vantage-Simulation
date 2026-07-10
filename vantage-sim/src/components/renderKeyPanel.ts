@@ -20,6 +20,9 @@ const DEFAULT_KEY_CONFIG: Record<string, { x: number; y: number; z: number }> = 
   "6": { x: 0.16, y: 0.04, z: 0.31 },
 };
 
+type KeyPosition = { x: number; y: number; z: number };
+type KeyEntry = [string, KeyPosition];
+
 const KEY_FACE_SIZE = 0.024;
 const KEY_DEPTH = 0.012;
 const PANEL_MARGIN = 0.035;
@@ -58,11 +61,58 @@ function makeDigitLabel(digit: string) {
   return label;
 }
 
+function isKeyPosition(value: unknown): value is KeyPosition {
+  const pos = value as Partial<KeyPosition>;
+  return (
+    typeof pos === "object" &&
+    pos !== null &&
+    Number.isFinite(pos.x) &&
+    Number.isFinite(pos.y) &&
+    Number.isFinite(pos.z)
+  );
+}
+
+function normalizeKeyConfig(raw: unknown): KeyEntry[] | null {
+  const rows = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as { keys?: unknown }).keys)
+      ? (raw as { keys: unknown[] }).keys
+      : null;
+
+  if (rows) {
+    const entries = rows
+      .slice(0, 6)
+      .map((row, index): KeyEntry | null => {
+        if (!isKeyPosition(row)) return null;
+        const maybeDigit = (row as { digit?: unknown }).digit;
+        const digit = maybeDigit === undefined ? String(index + 1) : String(maybeDigit);
+        if (!/^[0-9]$/.test(digit)) return null;
+        return [digit, { x: row.x, y: row.y, z: row.z }];
+      })
+      .filter((entry): entry is KeyEntry => entry !== null);
+
+    const uniqueDigits = new Set(entries.map(([digit]) => digit));
+    return entries.length === 6 && uniqueDigits.size === 6 ? entries : null;
+  }
+
+  if (raw && typeof raw === "object") {
+    const entries = Object.entries(raw as Record<string, unknown>)
+      .map(([digit, pos]): KeyEntry | null => {
+        if (!/^[0-9]$/.test(digit) || !isKeyPosition(pos)) return null;
+        return [digit, { x: pos.x, y: pos.y, z: pos.z }];
+      })
+      .filter((entry): entry is KeyEntry => entry !== null);
+    return entries.length === 6 ? entries.sort(([a], [b]) => Number(a) - Number(b)) : null;
+  }
+
+  return null;
+}
+
 export async function renderKeyPanel(
   scene: THREE.Scene,
   robot: URDFRobot
 ): Promise<void> {
-  let keyConfig = DEFAULT_KEY_CONFIG;
+  let entries: KeyEntry[] = Object.entries(DEFAULT_KEY_CONFIG).sort(([a], [b]) => Number(a) - Number(b));
 
   try {
     const res = await fetch(`/robot/key.config.json?v=${Date.now()}`, {
@@ -70,9 +120,8 @@ export async function renderKeyPanel(
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const loadedConfig = await res.json();
-    if (loadedConfig && Object.keys(loadedConfig).length === 6) {
-      keyConfig = loadedConfig;
-    }
+    const normalized = normalizeKeyConfig(loadedConfig);
+    if (normalized) entries = normalized;
   } catch (err) {
     console.warn("[renderKeyPanel] Using built-in key layout because key.config.json failed:", err);
   }
@@ -86,7 +135,6 @@ export async function renderKeyPanel(
   panelGroup.name = "key_panel";
   scene.add(panelGroup);
 
-  const entries = Object.entries(keyConfig).sort(([a], [b]) => Number(a) - Number(b));
   const xs = entries.map(([, pos]) => pos.x);
   const ys = entries.map(([, pos]) => pos.y);
   const zs = entries.map(([, pos]) => pos.z);

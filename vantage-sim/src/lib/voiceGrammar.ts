@@ -31,6 +31,10 @@ export function normalizeVoiceText(input: string) {
     [/\b(?:key|button)\s+(four|for)\b/g, "key 4"],
     [/\b(?:key|button)\s+(five|fife)\b/g, "key 5"],
     [/\b(?:key|button)\s+(six|sicks|sex)\b/g, "key 6"],
+    [/\b(?:key|button)\s+(seven)\b/g, "key 7"],
+    [/\b(?:key|button)\s+(eight|ate)\b/g, "key 8"],
+    [/\b(?:key|button)\s+(nine)\b/g, "key 9"],
+    [/\b(?:key|button)\s+(zero|oh)\b/g, "key 0"],
   ];
 
   for (const [pattern, replacement] of replacements) {
@@ -57,7 +61,7 @@ export function getSpeechAlternatives(event: any): SpeechAlternative[] {
 
 export function hasRecognizedVoiceIntent(text: string) {
   const normalized = normalizeVoiceText(text);
-  if (/(?:move\s+to\s+|press\s+|touch\s+)?key\s*[1-6]\b/.test(normalized)) return true;
+  if (/(?:move\s+to\s+|press\s+|touch\s+)?key\s*[0-9]\b/.test(normalized)) return true;
   if (/rotate\s+(?:base\s+)?-?\d+(?:\.\d+)?/.test(normalized)) return true;
   return DIRECTION_WORDS.some((direction) => normalized.includes(`move ${direction}`));
 }

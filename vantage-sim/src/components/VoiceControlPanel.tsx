@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import { useRobotStore } from "@/state/robotStore";
 import { useVoiceCommand } from "@/hooks/useVoiceCommand";
-import { moveToSmooth as moveTo } from "@/lib/animateArm";
+import { cancelArmAnimation, moveToSmooth as moveTo } from "@/lib/animateArm";
+import { moveTo as validateMoveTo } from "@/lib/moveTo";
 import { chooseBestVoiceTranscript, describeVoiceCorrection, getSpeechAlternatives, normalizeVoiceText } from "@/lib/voiceGrammar";
 import { formatSafetyReason } from "@/lib/safetyMessages";
 
@@ -19,11 +20,18 @@ type VoiceAction =
 type AgenticResponse = {
   confirmation: string;
   actions: VoiceAction[];
+  source?: "groq_tool" | "groq_json" | "fallback";
 };
 
 type Props = {
   onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
 };
+
+type MotionTarget = { x: number; y: number; z: number };
+
+type CompiledPlan =
+  | { ok: true; targets: MotionTarget[] }
+  | { ok: false; message: string; reason: string };
 
 const primaryButtonStyle = {
   backgroundColor: "var(--walnut-700)",
@@ -37,17 +45,21 @@ const disabledButtonStyle = {
   color: "var(--steel-600)",
 };
 
+const ACTION_SETTLE_MS = 680;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function getEeWorldPosition() {
   const { robot, stylusLinkName } = useRobotStore.getState();
   if (!robot || !stylusLinkName) return null;
   const link = robot.links[stylusLinkName];
   if (!link) return null;
-  const v = new THREE.Vector3();
-  link.getWorldPosition(v);
+  robot.updateMatrixWorld(true);
+  const v = link.localToWorld(new THREE.Vector3(0, 0, 0.04));
   return { x: v.x, y: v.y, z: v.z };
 }
 
-function rotatePointAroundWorldY(pos: { x: number; y: number; z: number }, degrees: number) {
+function rotatePointAroundWorldY(pos: MotionTarget, degrees: number) {
   const rad = THREE.MathUtils.degToRad(degrees);
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
@@ -56,6 +68,16 @@ function rotatePointAroundWorldY(pos: { x: number; y: number; z: number }, degre
     y: pos.y,
     z: pos.x * sin + pos.z * cos,
   };
+}
+
+function restoreRobotPose(angles: number[]) {
+  const { robot, jointNames } = useRobotStore.getState();
+  if (!robot) return;
+  jointNames.forEach((name, index) => {
+    robot.setJointValue(name, angles[index] ?? 0);
+  });
+  robot.updateMatrixWorld(true);
+  useRobotStore.getState().setCurrentAngles(angles);
 }
 
 export default function VoiceControlPanel({ onStatusChange }: Props) {
@@ -68,42 +90,68 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
   const [agentListening, setAgentListening] = useState(false);
   const agentRecognitionRef = useRef<any>(null);
 
-  const executeAction = (action: VoiceAction): { ok: boolean; message: string; reason?: string } => {
-    const cur = getEeWorldPosition();
+  const compilePlanTargets = (actions: VoiceAction[]): CompiledPlan => {
+    let simulated = getEeWorldPosition();
+    if (!simulated) return { ok: false, message: "Robot is not loaded yet.", reason: "robot_not_loaded" };
 
-    if (action.type === "clarify") {
-      return { ok: false, message: action.question, reason: "clarification_needed" };
+    const targets: MotionTarget[] = [];
+    for (const action of actions) {
+      if (action.type === "clarify") {
+        return { ok: false, message: action.question, reason: "clarification_needed" };
+      }
+
+      if (action.type === "reject") {
+        return { ok: false, message: action.reason, reason: "agent_rejected" };
+      }
+
+      let target: MotionTarget;
+      if (action.type === "move_delta") {
+        target = {
+          x: simulated.x + (action.dx ?? 0),
+          y: simulated.y + (action.dy ?? 0),
+          z: simulated.z + (action.dz ?? 0),
+        };
+      } else if (action.type === "move_absolute") {
+        target = { x: action.x, y: action.y, z: action.z };
+      } else if (action.type === "move_to_key") {
+        const keyTarget = keyPositions[action.digit];
+        if (!keyTarget) return { ok: false, message: `Key ${action.digit} is not loaded.`, reason: "key_not_loaded" };
+        target = keyTarget;
+      } else {
+        target = rotatePointAroundWorldY(simulated, action.degrees);
+      }
+
+      targets.push(target);
+      simulated = target;
     }
 
-    if (action.type === "reject") {
-      return { ok: false, message: action.reason, reason: "agent_rejected" };
+    return { ok: true, targets };
+  };
+
+  const preflightPlan = (targets: MotionTarget[]): { ok: true } | { ok: false; message: string; reason?: string; step: number } => {
+    const { robot, jointNames } = useRobotStore.getState();
+    if (!robot || jointNames.length === 0) {
+      return { ok: false, message: "Robot is not loaded yet.", reason: "robot_not_loaded", step: 0 };
     }
 
-    if (!cur) {
-      return { ok: false, message: "Robot is not loaded yet.", reason: "robot_not_loaded" };
+    cancelArmAnimation();
+    const originalAngles = jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0);
+
+    for (let i = 0; i < targets.length; i++) {
+      const result = validateMoveTo(targets[i]);
+      if (!result.success) {
+        restoreRobotPose(originalAngles);
+        return {
+          ok: false,
+          message: `Plan rejected before motion at step ${i + 1}: ${formatSafetyReason(result.reason)}`,
+          reason: result.reason,
+          step: i + 1,
+        };
+      }
     }
 
-    let target: { x: number; y: number; z: number };
-    if (action.type === "move_delta") {
-      target = {
-        x: cur.x + (action.dx ?? 0),
-        y: cur.y + (action.dy ?? 0),
-        z: cur.z + (action.dz ?? 0),
-      };
-    } else if (action.type === "move_absolute") {
-      target = { x: action.x, y: action.y, z: action.z };
-    } else if (action.type === "move_to_key") {
-      const keyTarget = keyPositions[action.digit];
-      if (!keyTarget) return { ok: false, message: `Key ${action.digit} is not loaded.`, reason: "key_not_loaded" };
-      target = keyTarget;
-    } else {
-      target = rotatePointAroundWorldY(cur, action.degrees);
-    }
-
-    const result = moveTo(target);
-    return result.success
-      ? { ok: true, message: `Moved to (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})` }
-      : { ok: false, message: formatSafetyReason(result.reason), reason: result.reason };
+    restoreRobotPose(originalAngles);
+    return { ok: true };
   };
 
   const runAgenticCommand = async (instruction: string) => {
@@ -126,17 +174,45 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
       const parsed = (await res.json()) as AgenticResponse;
       const actions = Array.isArray(parsed.actions) ? parsed.actions : [];
 
-      for (const action of actions) {
-        const outcome = executeAction(action);
-        if (!outcome.ok) {
-          const msg = `${parsed.confirmation} ${outcome.message}`;
-          setAgentStatus({ ok: false, message: msg });
-          onStatusChange?.(msg, false, outcome.reason);
-          return;
-        }
+      if (actions.length === 0) {
+        const msg = "Agent returned no executable actions.";
+        setAgentStatus({ ok: false, message: msg });
+        onStatusChange?.(msg, false, "agentic_empty_plan");
+        return;
       }
 
-      const msg = `${parsed.confirmation} ${actions.length} action(s) executed through moveTo.`;
+      const compiled = compilePlanTargets(actions);
+      if (!compiled.ok) {
+        const msg = `${parsed.confirmation} ${compiled.message}`;
+        setAgentStatus({ ok: false, message: msg });
+        onStatusChange?.(msg, false, compiled.reason);
+        return;
+      }
+
+      setAgentStatus({ ok: true, message: `${parsed.confirmation} Preflight-validating ${compiled.targets.length} step(s)...` });
+      const preflight = preflightPlan(compiled.targets);
+      if (!preflight.ok) {
+        const msg = `${parsed.confirmation} ${preflight.message}`;
+        setAgentStatus({ ok: false, message: msg });
+        onStatusChange?.(msg, false, preflight.reason);
+        return;
+      }
+
+      for (let i = 0; i < compiled.targets.length; i++) {
+        const target = compiled.targets[i];
+        setAgentStatus({ ok: true, message: `${parsed.confirmation} Executing validated step ${i + 1}/${compiled.targets.length}...` });
+        const result = moveTo(target);
+        if (!result.success) {
+          const msg = `${parsed.confirmation} Execution stopped at step ${i + 1}: ${formatSafetyReason(result.reason)}`;
+          setAgentStatus({ ok: false, message: msg });
+          onStatusChange?.(msg, false, result.reason);
+          return;
+        }
+        await delay(ACTION_SETTLE_MS);
+      }
+
+      const sourceLabel = parsed.source === "groq_tool" ? "Groq tool-call" : parsed.source === "fallback" ? "safe fallback" : "Groq JSON";
+      const msg = `${parsed.confirmation} ${actions.length} action(s) executed through moveTo. Source: ${sourceLabel}.`;
       setAgentStatus({ ok: true, message: msg });
       onStatusChange?.(msg, true);
     } catch (err) {
@@ -199,7 +275,7 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
           Voice Control
         </p>
         <p className="text-[11px] text-[--steel-600] font-sans">
-          Local speech handles fixed commands. Agentic speech sends the spoken instruction directly to Groq and executes only safe structured actions.
+          Local speech handles fixed commands. Agentic speech uses Groq tool-calling, then executes only validator-approved structured actions.
         </p>
       </div>
 
@@ -240,7 +316,7 @@ export default function VoiceControlPanel({ onStatusChange }: Props) {
         <textarea
           value={agentInput}
           onChange={(e) => setAgentInput(e.target.value)}
-          placeholder='Optional typed fallback: "move to key 4 then move up a little"'
+          placeholder='Try: "move to key 4 then move up a little"'
           rows={3}
           className="w-full rounded border border-[--steel-400] bg-white px-3 py-2 text-xs text-[--walnut-900] outline-none focus:border-[--copper]"
         />

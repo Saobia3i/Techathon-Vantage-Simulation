@@ -1,105 +1,270 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { moveToSmooth as moveTo } from "../lib/animateArm";
+import { formatSafetyReason } from "@/lib/safetyMessages";
 import { useRobotStore } from "../state/robotStore";
 
-// TypeScript-এর জন্য Props ডিফাইন করা হলো (যাতে page.tsx থেকে আসা ডেটা রিসিভ করতে পারে)
 interface PinControlsProps {
   onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
 }
 
+type PinValidation =
+  | { ok: true; sequence: string[]; normalized: string; message: string }
+  | { ok: false; sequence: string[]; normalized: string; message: string; reason: string };
+
+type StepState = {
+  index: number;
+  digit: string;
+  status: "pending" | "running" | "success" | "failed";
+  message: string;
+};
+
+const PIN_LENGTH = 6;
+const APPROACH_LIFT_METERS = 0.055;
+const DWELL_MS = 450;
+const TRAVEL_MS = 680;
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export default function PinControls({ onStatusChange }: PinControlsProps) {
-  const [pin, setPin] = useState("123456");
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [status, setStatus] = useState("Ready for input");
+function validatePinInput(raw: string, availableKeys: string[]): PinValidation {
+  const normalized = raw.replace(/[\s,-]/g, "");
+  const sequence = normalized.split("").filter(Boolean);
+  const availableSet = new Set(availableKeys);
 
-  const updateStatus = (msg: string) => {
+  if (raw.trim().length === 0) {
+    return {
+      ok: false,
+      sequence: [],
+      normalized,
+      message: `Enter a 6-digit PIN using loaded board keys: ${availableKeys.join(", ") || "none"}.`,
+      reason: "pin_empty",
+    };
+  }
+
+  if (/[^0-9]/.test(normalized)) {
+    return {
+      ok: false,
+      sequence,
+      normalized,
+      message: "Invalid input: use digits only. Spaces, commas, and hyphens are allowed as separators.",
+      reason: "pin_contains_non_digit",
+    };
+  }
+
+  if (sequence.length !== PIN_LENGTH) {
+    return {
+      ok: false,
+      sequence,
+      normalized,
+      message: `Invalid length: expected ${PIN_LENGTH} digits, received ${sequence.length}.`,
+      reason: "pin_invalid_length",
+    };
+  }
+
+  const invalidDigit = sequence.find((digit) => !availableSet.has(digit));
+  if (invalidDigit) {
+    return {
+      ok: false,
+      sequence,
+      normalized,
+      message: `Digit ${invalidDigit} not available on this panel. Available keys: ${availableKeys.join(", ") || "none"}.`,
+      reason: "pin_digit_out_of_range",
+    };
+  }
+
+  return {
+    ok: true,
+    sequence,
+    normalized,
+    message: `Validated sequence: ${sequence.join(" -> ")}`,
+  };
+}
+
+export default function PinControls({ onStatusChange }: PinControlsProps) {
+  const keyPositions = useRobotStore((state) => state.keyPositions);
+  const [pinInput, setPinInput] = useState("");
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [status, setStatus] = useState("Ready for PIN input");
+  const [steps, setSteps] = useState<StepState[]>([]);
+
+  const availableKeys = useMemo(() => Object.keys(keyPositions).sort((a, b) => Number(a) - Number(b)), [keyPositions]);
+  const validation = useMemo(
+    () => validatePinInput(pinInput, availableKeys),
+    [pinInput, availableKeys],
+  );
+
+  const setStepStatus = (index: number, status: StepState["status"], message: string) => {
+    setSteps((prev) =>
+      prev.map((step) => (step.index === index ? { ...step, status, message } : step)),
+    );
+  };
+
+  const report = (msg: string, success: boolean, reason?: string) => {
     setStatus(msg);
-    if (onStatusChange) {
-      onStatusChange(msg, true);
-    }
+    onStatusChange?.(msg, success, reason);
   };
 
   const executePin = async () => {
-    if (!pin || isExecuting) return;
+    if (isExecuting) return;
 
-    const keyPositions = useRobotStore.getState().keyPositions;
-
-    if (Object.keys(keyPositions).length === 0) {
-      const errorMsg = "Error: Key positions not loaded yet!";
-      setStatus(errorMsg);
-      if (onStatusChange) onStatusChange(errorMsg, false, "No positions");
+    if (!validation.ok) {
+      report(validation.message, false, validation.reason);
       return;
     }
 
     setIsExecuting(true);
-    updateStatus("Starting autonomous sequence...");
+    setSteps(
+      validation.sequence.map((digit, index) => ({
+        index,
+        digit,
+        status: "pending",
+        message: "Waiting",
+      })),
+    );
+    report(`Starting validated PIN: ${validation.sequence.join(" -> ")}`, true);
 
-    for (let i = 0; i < pin.length; i++) {
-      const digit = pin[i];
-      const targetPos = keyPositions[digit];
+    for (let index = 0; index < validation.sequence.length; index++) {
+      const digit = validation.sequence[index];
+      const target = keyPositions[digit];
 
-      if (!targetPos) {
-        console.warn(`No coordinates found for digit: ${digit}`);
-        continue;
+      if (!target) {
+        const msg = `Key ${digit} target disappeared during execution.`;
+        setStepStatus(index, "failed", msg);
+        report(msg, false, "pin_key_not_loaded");
+        setIsExecuting(false);
+        return;
       }
 
-      updateStatus(`Targeting digit: ${digit}`);
-      const hoverZ = targetPos.z - 0.05;
+      const approach = { x: target.x, y: target.y + APPROACH_LIFT_METERS, z: target.z };
 
-      moveTo({ x: targetPos.x, y: targetPos.y, z: hoverZ });
-      await delay(700); // wait for smooth animation to settle before pressing
+      setStepStatus(index, "running", "Approaching");
+      report(`Approaching key ${digit}`, true);
+      const approachResult = moveTo(approach);
+      if (!approachResult.success) {
+        const msg = `Key ${digit} approach blocked: ${formatSafetyReason(approachResult.reason)}`;
+        setStepStatus(index, "failed", msg);
+        report(msg, false, approachResult.reason);
+        setIsExecuting(false);
+        return;
+      }
+      await delay(TRAVEL_MS);
 
-      updateStatus(`Pressing digit: ${digit}`);
-      moveTo({ x: targetPos.x, y: targetPos.y, z: targetPos.z });
-      await delay(500); // dwell time — arm touches key
+      setStepStatus(index, "running", "Touching");
+      report(`Touching key ${digit}`, true);
+      const touchResult = moveTo(target);
+      if (!touchResult.success) {
+        const msg = `Key ${digit} touch blocked: ${formatSafetyReason(touchResult.reason)}`;
+        setStepStatus(index, "failed", msg);
+        report(msg, false, touchResult.reason);
+        setIsExecuting(false);
+        return;
+      }
+      await delay(DWELL_MS);
 
-      moveTo({ x: targetPos.x, y: targetPos.y, z: hoverZ });
-      await delay(600); // retract before next key
+      setStepStatus(index, "running", "Retracting");
+      const retractResult = moveTo(approach);
+      if (!retractResult.success) {
+        const msg = `Key ${digit} retract blocked: ${formatSafetyReason(retractResult.reason)}`;
+        setStepStatus(index, "failed", msg);
+        report(msg, false, retractResult.reason);
+        setIsExecuting(false);
+        return;
+      }
+      await delay(TRAVEL_MS);
+
+      setStepStatus(index, "success", "Done");
     }
 
-    updateStatus("Sequence complete! Returning to home.");
-    moveTo({ x: 0.12, y: 0.25, z: 0.15 });
-
+    report(`PIN complete: ${validation.sequence.join("")}`, true);
     setIsExecuting(false);
   };
 
+  const isValid = validation.ok;
+
   return (
-    <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-      <h3 className="font-bold text-gray-900 mb-4">Autonomous PIN Entry 🤖</h3>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-1">
-            Enter PIN (1-6 only)
-          </label>
-          <input
-            type="text"
-            value={pin}
-            onChange={(e) =>
-              setPin(e.target.value.replace(/[^1-6]/g, "").slice(0, 6))
-            }
-            disabled={isExecuting}
-            className="w-full border border-gray-300 rounded-md shadow-sm p-2 text-black bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-base"
-            placeholder="e.g. 123456"
-          />
-        </div>
-        <button
-          onClick={executePin}
-          disabled={isExecuting || pin.length === 0}
-          className={`w-full py-2 px-4 rounded-md text-white font-medium ${
-            isExecuting ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+    <div className="space-y-5">
+      <div>
+        <p className="text-[13px] font-bold font-sans uppercase tracking-wider text-[--walnut-700] mb-1">
+          Autonomous PIN Entry
+        </p>
+        <p className="text-[11px] text-[--steel-600] font-sans">
+          Type any candidate PIN. The sequencer validates it against the six loaded board keys before motion.
+        </p>
+      </div>
+
+      <div className="rounded border border-[--steel-400] p-3 space-y-3">
+        <label className="block text-[11px] font-bold text-[--walnut-700] uppercase tracking-wider font-sans">
+          PIN Input
+        </label>
+        <input
+          type="text"
+          value={pinInput}
+          onChange={(event) => setPinInput(event.target.value)}
+          disabled={isExecuting}
+          className="w-full rounded border border-[--steel-400] bg-white px-3 py-2 text-sm text-[--walnut-900] outline-none focus:border-[--copper] font-mono"
+          placeholder={availableKeys.length ? `Example: ${availableKeys.join("-")}` : "Example: 1-2-3-4-5-6"}
+          inputMode="numeric"
+        />
+
+        <div
+          className={`rounded border p-2.5 text-xs font-sans ${
+            isValid
+              ? "bg-[--safe-bg] border-[--safe-text]/30 text-[--safe-text]"
+              : "bg-red-50 border-red-200 text-red-700"
           }`}
         >
-          {isExecuting ? "Executing..." : "Submit PIN"}
-        </button>
-        <div className="mt-4 p-3 bg-slate-50 border border-gray-200 rounded-md">
-          <p className="text-sm text-gray-800 font-mono">
-            <strong>Status:</strong> {status}
+          <p className="font-semibold">{validation.message}</p>
+          <p className="mt-1 font-mono">
+            Normalized: {validation.normalized || "none"} | Loaded keys: {availableKeys.join(", ") || "none"}
           </p>
         </div>
+
+        <button
+          onClick={executePin}
+          disabled={isExecuting || !isValid}
+          className="w-full px-4 py-2 rounded border text-sm font-semibold transition-colors"
+          style={{
+            backgroundColor: isExecuting || !isValid ? "var(--steel-200)" : "var(--walnut-700)",
+            borderColor: isExecuting || !isValid ? "var(--steel-400)" : "var(--walnut-700)",
+            color: isExecuting || !isValid ? "var(--steel-600)" : "#ffffff",
+          }}
+        >
+          {isExecuting ? "Executing..." : "Run Validated PIN"}
+        </button>
+      </div>
+
+      <div className="rounded border border-[--steel-400] p-3 space-y-2">
+        <p className="text-[11px] font-bold text-[--walnut-700] uppercase tracking-wider font-sans">
+          Validated Output
+        </p>
+        {steps.length === 0 ? (
+          <p className="text-xs text-[--steel-600] font-sans">{status}</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-1.5">
+            {steps.map((step) => (
+              <div
+                key={`${step.index}-${step.digit}`}
+                className="flex items-center justify-between rounded border border-[--steel-200] bg-[--panel] px-2.5 py-2 text-xs"
+              >
+                <span className="font-mono text-[--walnut-700]">
+                  #{step.index + 1} Key {step.digit}
+                </span>
+                <span
+                  className={
+                    step.status === "success"
+                      ? "text-[--safe-text] font-semibold"
+                      : step.status === "failed"
+                        ? "text-red-700 font-semibold"
+                        : "text-[--steel-600] font-semibold"
+                  }
+                >
+                  {step.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

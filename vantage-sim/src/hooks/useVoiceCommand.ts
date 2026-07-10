@@ -48,7 +48,7 @@ export const useVoiceCommand = (onStatusChange?: VoiceStatusCallback) => {
       return;
     }
 
-    const keyMatch = spoken.match(/(?:move\s+to\s+|press\s+|touch\s+)?key\s*([1-6])/);
+    const keyMatch = spoken.match(/(?:move\s+to\s+|press\s+|touch\s+)?key\s*([0-9])/);
     if (keyMatch) {
       const target = keyPositions[keyMatch[1]];
       if (!target) {
