@@ -165,7 +165,7 @@ export function DashboardControls({ onStatusChange, isHUD }: DashboardControlsPr
             {keys.map(([digit, pos]) => (
               <button
                 key={digit}
-                className="h-6 rounded border border-[--steel-400]/30 bg-white/55 text-[9px] font-bold text-[--walnut-900] hover:bg-[--copper] hover:text-white transition cursor-pointer active:scale-90"
+                className="h-6 rounded border border-[--steel-400]/30 bg-white/55 text-[9px] font-bold text-[--walnut-900] hover:bg-[--copper] hover:text-[--walnut-900] transition cursor-pointer active:scale-90"
                 onClick={() => handleKeyClick(digit, pos)}
                 title={`Coords: x=${pos.x.toFixed(2)}, y=${pos.y.toFixed(2)}, z=${pos.z.toFixed(2)}`}
               >
@@ -204,13 +204,13 @@ export function DashboardControls({ onStatusChange, isHUD }: DashboardControlsPr
                     <div className="flex gap-1">
                       <button
                         onClick={() => nudgeJoint(originalIndex, -0.15)}
-                        className="w-5 h-5 rounded border border-[--steel-400]/20 bg-[--steel-200] text-[--walnut-900] font-bold hover:bg-[--copper] hover:text-white transition-colors cursor-pointer text-[9px] flex items-center justify-center active:scale-90"
+                        className="w-5 h-5 rounded border border-[--steel-400]/20 bg-[--steel-200] text-[--walnut-900] font-bold hover:bg-[--copper] hover:text-[--walnut-900] transition-colors cursor-pointer text-[9px] flex items-center justify-center active:scale-90"
                       >
                         &minus;
                       </button>
                       <button
                         onClick={() => nudgeJoint(originalIndex, 0.15)}
-                        className="w-5 h-5 rounded border border-[--steel-400]/20 bg-[--steel-200] text-[--walnut-900] font-bold hover:bg-[--copper] hover:text-white transition-colors cursor-pointer text-[9px] flex items-center justify-center active:scale-90"
+                        className="w-5 h-5 rounded border border-[--steel-400]/20 bg-[--steel-200] text-[--walnut-900] font-bold hover:bg-[--copper] hover:text-[--walnut-900] transition-colors cursor-pointer text-[9px] flex items-center justify-center active:scale-90"
                       >
                         +
                       </button>
@@ -290,13 +290,13 @@ export function DashboardControls({ onStatusChange, isHUD }: DashboardControlsPr
                   <div className="flex gap-1.5 justify-center">
                     <button
                       onClick={() => nudgeJoint(originalIndex, -0.15)}
-                      className="flex-1 h-7 rounded border border-[--steel-400]/40 bg-[--steel-200] text-[--walnut-900] font-black hover:bg-[--copper] hover:text-white transition-colors cursor-pointer text-xs flex items-center justify-center active:scale-95"
+                      className="flex-1 h-7 rounded border border-[--steel-400]/40 bg-[--steel-200] text-[--walnut-900] font-black hover:bg-[--copper] hover:text-[--walnut-900] transition-colors cursor-pointer text-xs flex items-center justify-center active:scale-95"
                     >
                       &minus;
                     </button>
                     <button
                       onClick={() => nudgeJoint(originalIndex, 0.15)}
-                      className="flex-1 h-7 rounded border border-[--steel-400]/40 bg-[--steel-200] text-[--walnut-900] font-black hover:bg-[--copper] hover:text-white transition-colors cursor-pointer text-xs flex items-center justify-center active:scale-95"
+                      className="flex-1 h-7 rounded border border-[--steel-400]/40 bg-[--steel-200] text-[--walnut-900] font-black hover:bg-[--copper] hover:text-[--walnut-900] transition-colors cursor-pointer text-xs flex items-center justify-center active:scale-95"
                     >
                       +
                     </button>

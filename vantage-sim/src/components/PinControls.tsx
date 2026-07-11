@@ -211,7 +211,7 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
               key={digit}
               disabled={isExecuting || pinInput.length >= PIN_LENGTH}
               onClick={() => setPinInput((prev) => (prev.length < PIN_LENGTH ? prev + digit : prev))}
-              className="h-7 rounded border border-[--steel-400]/30 bg-[--steel-200]/70 text-[11px] font-bold text-[--walnut-900] hover:bg-[--copper] hover:text-white transition cursor-pointer active:scale-90 disabled:opacity-40"
+              className="h-7 rounded border border-[--steel-400]/30 bg-[--steel-200]/70 text-[11px] font-bold text-[--walnut-900] hover:bg-[--copper] hover:text-[--walnut-900] transition cursor-pointer active:scale-90 disabled:opacity-40"
             >
               {digit}
             </button>
@@ -223,7 +223,7 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
           <button
             disabled={isExecuting || pinInput.length === 0}
             onClick={() => setPinInput((prev) => prev.slice(0, -1))}
-            className="h-7 rounded border border-[--steel-400]/40 bg-[--steel-100] text-[11px] font-bold text-[--walnut-700] hover:bg-[--steel-200] transition cursor-pointer active:scale-90 disabled:opacity-40"
+            className="h-7 rounded border border-[--steel-400]/40 bg-[--steel-100] text-[11px] font-bold text-[--walnut-700] hover:bg-[--steel-300] hover:text-[--walnut-900] transition cursor-pointer active:scale-90 disabled:opacity-40"
             title="Backspace"
           >
             ⌫

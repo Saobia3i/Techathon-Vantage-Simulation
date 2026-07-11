@@ -279,7 +279,7 @@ export default function VoiceControlPanel({ onStatusChange, isHUD }: Props) {
             onClick={startListening}
             disabled={deterministicDisabled}
             className={`flex-1 h-7 rounded border text-[9px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-              isListening ? "bg-red-500 text-white border-red-500 animate-pulse" : "bg-[--steel-200] border-[--steel-400]/30 text-[--walnut-900] hover:bg-[--copper] hover:text-white"
+              isListening ? "bg-red-500 text-white border-red-500 animate-pulse" : "bg-[--steel-200] border-[--steel-400]/30 text-[--walnut-900] hover:bg-[--copper] hover:text-[--walnut-900]"
             }`}
           >
             🎤 Local
@@ -288,7 +288,7 @@ export default function VoiceControlPanel({ onStatusChange, isHUD }: Props) {
             onClick={startAgenticListening}
             disabled={agentMicDisabled}
             className={`flex-1 h-7 rounded border text-[9px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-              agentListening ? "bg-red-500 text-white border-red-500 animate-pulse" : agentBusy ? "bg-amber-500 text-white border-amber-500 animate-pulse" : "bg-[--steel-200] border-[--steel-400]/30 text-[--walnut-900] hover:bg-[--copper] hover:text-white"
+              agentListening ? "bg-red-500 text-white border-red-500 animate-pulse" : agentBusy ? "bg-amber-500 text-white border-amber-500 animate-pulse" : "bg-[--steel-200] border-[--steel-400]/30 text-[--walnut-900] hover:bg-[--copper] hover:text-[--walnut-900]"
             }`}
           >
             🤖 AI
@@ -313,7 +313,7 @@ export default function VoiceControlPanel({ onStatusChange, isHUD }: Props) {
           <button
             onClick={() => runAgenticCommand(agentInput)}
             disabled={typedDisabled}
-            className="px-2 h-[19px] rounded border border-[--steel-400]/40 bg-[--steel-200] hover:bg-[--copper] hover:text-white text-[9px] font-bold cursor-pointer disabled:opacity-50"
+            className="px-2 h-[19px] rounded border border-[--steel-400]/40 bg-[--steel-200] hover:bg-[--copper] hover:text-[--walnut-900] text-[9px] font-bold cursor-pointer disabled:opacity-50"
           >
             Run
           </button>
@@ -321,7 +321,9 @@ export default function VoiceControlPanel({ onStatusChange, isHUD }: Props) {
 
         {/* Tiny live status feedback */}
         {(transcript || agentTranscript || agentStatus) && (
-          <div className="mt-1.5 text-[8px] font-mono text-[--steel-600] border-t border-[--steel-400]/20 pt-1 max-h-[30px] overflow-hidden truncate">
+          <div className={`mt-1.5 text-[8px] font-mono border-t border-[--steel-400]/20 pt-1 max-h-[56px] overflow-y-auto leading-relaxed break-words whitespace-pre-wrap ${
+            agentStatus?.ok === false ? "text-red-600" : agentStatus?.ok === true && agentBusy ? "text-amber-700" : "text-[--steel-600]"
+          }`}>
             {agentStatus ? agentStatus.message : (agentTranscript ? `AI: ${agentTranscript}` : `Local: ${transcript}`)}
           </div>
         )}
