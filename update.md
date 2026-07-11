@@ -1,95 +1,261 @@
 # Vantage Digital Twin Update
 
+This file compares the current implementation with `CONTEXT.md` and summarizes what has been done, how it was done, how to verify it, and what is still a known limitation.
+
+## Context Alignment
+
+### Core Rule
+`CONTEXT.md` says every control surface must route motion through `moveTo(x, y, z)`.
+
+Current status: done.
+
+How it is enforced:
+- Dashboard key buttons call `moveToSmooth()`, which internally validates through `moveTo()`.
+- Keyboard calls `moveToSmooth()` for each WASD/QE movement.
+- Joystick calls `moveToSmooth()` for drag, height, and step nudges.
+- Deterministic voice calls `moveToSmooth()`.
+- Agentic voice converts language into structured actions, preflight-validates the whole plan through `moveTo()`, then executes approved steps with `moveToSmooth()`.
+- Autonomous PIN entry validates input first, then calls `moveToSmooth()` for approach, touch, and retract.
+
+No main input path is allowed to set joint angles directly as its motion API.
+
 ## Done
 
-### Core Architecture
-- All main motion paths are still routed through `moveTo(target)`.
-- Dashboard key buttons, keyboard, joystick, deterministic voice, agentic voice, and PIN sequencing use the same IK/safety pipeline.
-- Electrical schematic/Wokwi work was not touched. That remains teammate-owned.
+### Phase 1 - Visualization and Dashboard
+- URDF arm is loaded with Three.js and `urdf-loader`.
+- The robot is rendered with steel/brass-style materials and a warm studio scene.
+- Zustand stores the loaded robot, joints, links, current joint angles, joint limits, stylus link, key targets, and latest IK report.
+- Dashboard and telemetry show robot state and equation-wise IK diagnostics.
 
-### IK Core Pipeline
-- Implemented/checked Damped Least Squares IK:
+### Phase 2 - IK Core Pipeline
+- Implemented Damped Least Squares inverse kinematics in `moveTo.ts`.
+- Main equations shown in telemetry:
   - `e = targetWorld - endEffectorWorld`
   - `J_i = jointAxisWorld x (endEffectorWorld - jointOriginWorld)`
   - `deltaTheta = J^T (J J^T + lambda^2 I)^-1 e_step`
   - `q_next = clamp(q_current + deltaTheta, lowerLimit, upperLimit)`
-- Workspace checks are in `moveTo()`:
+- Safety gates inside `moveTo()`:
   - robot loaded
   - active joints exist
-  - target max reach
-  - target min reach
-  - ground limit
-  - convergence within 5 mm
-  - final joint limit validation
-- Telemetry shows equation-wise IK output after motion attempts.
+  - max reach
+  - min reach
+  - ground/keypad surface guard
+  - IK convergence within 5 mm
+  - joint limit validation
+  - sampled ground/keypad collision check
+- `moveToSmooth()` wraps `moveTo()` so callers get the same validation plus visible smooth animation.
 
-### Keypad / Six Buttons
-- Fixed the previous loose floating cube look.
-- Restored `key.config.json` to organizer-style base-frame coordinates.
-- Rendered the six keys as a real test panel:
-  - dark backplate
-  - raised colored keys
-  - visible digit labels `1-6`
-  - target points stored on the key face, not inside the cube
-- Key targets are converted from robot/base frame to world frame before being stored.
+### Keypad and `key.config.json`
+- Six-key panel is rendered as a real keypad/backplate, not loose floating cubes.
+- Targets are placed at the key face center.
+- Key targets are converted to world coordinates before being stored in Zustand.
+- `key.config.json` now supports both likely organizer formats:
+  - object map: `{ "1": { "x": ..., "y": ..., "z": ... } }`
+  - labeled array: `{ "keys": [{ "digit": "8", "x": ..., "y": ..., "z": ... }] }`
+- If a config has unlabeled array positions, the app assigns fallback labels `1-6` by order and this should be explained during demo.
 
-### Voice Control
-- Deterministic voice supports:
+### Phase 3 - Manual Controls
+- Keyboard supports WASD + QE movement in the correct world frame.
+- Joystick was rebuilt as `JoystickControl.tsx` using native pointer events.
+- Joystick mapping:
+  - right = `+X`
+  - left = `-X`
+  - forward = `-Z`
+  - backward = `+Z`
+  - height slider = world `Y`
+- Joystick reads the live end-effector tip before each move and uses `moveToSmooth()`.
+
+### Phase 3 - Deterministic Voice
+- Uses browser `SpeechRecognition`.
+- Supports:
   - `move up`
   - `move down`
   - `move left`
   - `move right`
   - `move forward`
   - `move backward`
-  - `move to key 1-6`
+  - `move to key N`
   - `rotate base 30 degrees`
-- Phase 3B agentic voice added:
-  - separate `Speak Agentic Command` button
-  - typed fallback for testing
-  - server route `/api/agentic-voice`
-  - Groq output converted into strict structured actions
-  - malformed/weak Groq output falls back to safe local parsing
-  - final execution still goes through `moveTo()`
+- Recognition is hardened:
+  - checks up to 5 speech alternatives
+  - normalizes common errors like `move write` -> `move right`
+  - supports key word homophones such as `key eight`, `key two`, `key oh`
 
-### Verification
+### Phase 3B - Agentic Voice Bonus
+- Implemented `/api/agentic-voice`.
+- Uses Groq tool-calling with a `plan_robot_motion` function schema.
+- The model returns:
+  - `confirmation`
+  - strict structured action list
+- Supported action types:
+  - `move_delta`
+  - `move_absolute`
+  - `move_to_key`
+  - `rotate_base`
+  - `clarify`
+  - `reject`
+- Safety hardening:
+  - ambiguous instructions return `clarify`
+  - malformed output falls back to safe local parsing
+  - impossible/unsafe output is rejected or discarded
+  - max 5 actions per plan
+  - relative deltas are capped at 0.20 m
+  - absolute coordinates are bounded before client execution
+  - the browser compiles the whole returned plan into targets
+  - the browser preflight-validates every target through raw `moveTo()`
+  - robot pose is restored after preflight
+  - only a fully valid plan is executed visibly through `moveToSmooth()`
+
+This directly addresses the context warning against an ungated agent.
+
+### Phase 4 - Autonomous PIN Entry
+- PIN is not hardcoded.
+- User enters a runtime PIN in the UI.
+- Valid PIN rule:
+  - exactly 6 digits
+  - each digit must exist on the loaded six-key panel
+  - repeated digits are allowed
+- Examples:
+  - valid for current fallback panel: `123456`, `112233`, `654321`
+  - invalid if digit missing from panel: `127456`
+  - invalid length: `1234`
+  - invalid characters: `abcdef`
+- The sequencer shows validated normalized output before execution.
+- It performs approach -> touch -> retract for each digit.
+- Approach/retract lift in world `Y`, matching the coordinate contract.
+- Every motion result is checked; a failed approach/touch/retract aborts the sequence visibly.
+
+### Safety Feedback
+- Raw reason codes are translated into readable UI messages.
+- Examples:
+  - `board_collision` -> `Invalid: keypad collision risk`
+  - `ground_collision` -> `Invalid: ground collision risk`
+  - `ik_did_not_converge` -> `Invalid: IK could not reach the target within 5 mm`
+- The global safety pill and local panels show the result.
+
+## How To Understand The Agent Works
+
+Use the Voice tab, Phase 3B Agentic Voice section.
+
+### Test 1 - Valid Multi-Step Plan
+Typed command:
+
+```text
+move right a little then move up a little
+```
+
+Expected:
+- UI says Groq is interpreting.
+- It executes step 1, then step 2.
+- Final message says actions executed through `moveTo`.
+- Source should show `Groq tool-call` if `GROQ_API_KEY` is active, otherwise `safe fallback`.
+
+What this proves:
+- Free-form language was converted to structured actions.
+- Multiple actions were sequenced.
+- Execution still went through the motion pipeline.
+
+### Test 2 - Key Target Plus Relative Move
+Typed command:
+
+```text
+move to key 4 then move up a little
+```
+
+Expected:
+- Agent converts to `move_to_key` then `move_delta`.
+- Browser preflight-validates both steps.
+- If both are safe, the arm moves to key 4 and then lifts up.
+
+What this proves:
+- The agent can mix key commands and relative motion.
+
+### Test 3 - Unsafe Later Step
+Typed command:
+
+```text
+move to key 4, move down, move up a little
+```
+
+Expected:
+- The app rejects before visible motion.
+- Message should say something like:
+  `Plan rejected before motion at step 2: Invalid: keypad collision risk`
+
+What this proves:
+- The app does not execute the first safe step if a later step is unsafe.
+- The agent is gated by the same safety validator, not trusted blindly.
+
+### Test 4 - Ambiguous Command
+Typed command:
+
+```text
+move there
+```
+
+Expected:
+- The robot does not move.
+- Agent asks for clarification.
+
+What this proves:
+- Ambiguous intent is not guessed.
+
+### Test 5 - Invalid/Out-of-Range Motion
+Typed command:
+
+```text
+move up 5 meters
+```
+
+Expected:
+- The action is clamped/rejected/preflight-blocked.
+- The robot does not execute unsafe motion.
+
+What this proves:
+- Large unsafe requests are gated.
+
+## How To Verify The Required App
+
+### Build Verification
 - `npx tsc --noEmit` passed.
 - `npm run build` passed.
-- Next build includes `/api/agentic-voice` as a dynamic server route.
+- Next build includes `/api/agentic-voice` as a dynamic API route.
 
-## Ki Ki Bad / Remaining Issues
+### Manual Demo Checklist
+- Dashboard: click loaded key buttons.
+- Joystick: drag circular pad, move height slider, use step nudges.
+- Keyboard: activate keyboard panel and use WASD + QE.
+- Deterministic voice: say `move right`, `move up`, `move to key 4`.
+- Agentic voice typed: run `move to key 4 then move up a little`.
+- Agentic voice invalid: run `move to key 4, move down, move up a little`.
+- PIN: enter `123456` or repeated valid digits like `112233`.
+- PIN invalid: enter `127456` or `1234` and confirm graceful rejection.
 
-### Must Recheck In Browser
-- Restart the dev server and hard refresh the browser. Old runtime state/cache can still show the old floating keys.
-- Test these manually:
-  - Dashboard `Key 1-6`
-  - PIN preset `1-2-3-4-5-6`
-  - deterministic voice `move up`
-  - agentic typed fallback `move to key 4 then move up`
-  - agentic mic command with the same phrase
+## Remaining Issues / Assumptions
 
-### Keypad Placement
-- `CONTEXT.md` says `key.config.json` coordinates are organizer-provided and base-frame relative.
-- Current coordinates are placeholder/sample coordinates. If the official PDF gives exact key positions, replace only `public/robot/key.config.json`.
-- Do not move the keys arbitrarily in code unless the official coordinates are wrong or unreachable.
+### Official Key Config
+- Current `public/robot/key.config.json` is a sample/fallback layout.
+- If the official file contains different digit labels, the app will now use those labels.
+- If the official file contains only coordinates, the app assigns `1-6` by order and this assumption should be explained.
 
 ### IK Limitations
-- This is kinematic IK only, not physics/collision simulation.
-- The DLS solver targets position only. It does not solve stylus orientation.
-- If a key is reachable only with a specific stylus angle, this solver may still fail because orientation is not constrained.
-- Near singular poses can still be difficult, though a singularity kick and ready pose help.
+- This is kinematic IK, not physics simulation.
+- The solver targets position only; it does not solve stylus orientation.
+- Some poses can still fail if the position is reachable only with a required stylus orientation.
+- Singularity kick and ready pose reduce, but do not eliminate, singularity risk.
 
-### Agentic Voice
-- Groq requires `GROQ_API_KEY` in `.env`.
-- Dev server must be restarted after changing `.env`.
-- Browser SpeechRecognition support varies. Chrome/Edge are safest.
-- Agentic route has safe fallback, but real Groq behavior still needs live API testing.
+### Agentic Voice Runtime
+- `GROQ_API_KEY` must exist in `.env`.
+- Restart the dev server after editing `.env`.
+- If Groq is unavailable, safe local fallback still works, but the source will not be `Groq tool-call`.
+- Browser speech recognition works best in Chrome/Edge.
 
-### CONTEXT.md Notes
-- The architecture guidance is correct: every motion must go through `moveTo()`.
-- The electrical schematic ownership separation is correct and was respected.
-- Minor mismatch: `CONTEXT.md` says Next.js 15, but the app currently uses Next.js 16.
-- Minor mismatch: `CONTEXT.md` mentions shadcn/ui, but current UI is mostly custom Tailwind/CSS.
+### Context Mismatches
+- `CONTEXT.md` says Next.js 15, current app uses Next.js 16.2.10.
+- `CONTEXT.md` mentions shadcn/ui, current app mostly uses custom Tailwind/CSS.
+- `CONTEXT.md` says no collision simulation required; this app includes a lightweight ground/keypad safety sampling check as an extra validator, not a full physics engine.
 
-## Do Not Touch
+## Not Touched
+
 - Electrical schematic / Wokwi / teammate-owned Phase 5 files.
-- Any code path that bypasses `moveTo()` for motion.
+- The core `moveTo(target)` public contract.

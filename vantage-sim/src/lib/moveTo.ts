@@ -218,7 +218,7 @@ export function moveTo(target: Vector3Like): IKResult {
     const errorNorm = error.length();
     lastErrorNorm = errorNorm;
 
-    if (errorNorm < TOLERANCE) {
+    if (iter > 0 && errorNorm < TOLERANCE) {
       converged = true;
       console.log(`[moveTo] Converged in ${iter} iters - error: ${(errorNorm * 1000).toFixed(2)}mm`);
       break;

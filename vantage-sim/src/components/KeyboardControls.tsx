@@ -9,8 +9,8 @@ import { useRobotStore } from "@/state/robotStore";
 
 const STEP_NORMAL = 0.02;
 const STEP_FINE = 0.005;
-const KEYBOARD_MOVE_MS = 95;
-const KEY_REPEAT_THROTTLE_MS = 85;
+const KEYBOARD_MOVE_MS = 30;
+const KEY_REPEAT_THROTTLE_MS = 30;
 
 const KEY_BINDINGS = [
   { key: "W", axis: "z" as const, dir: -1, label: "Forward (-Z)" },
@@ -25,8 +25,10 @@ type Axis = "x" | "y" | "z";
 
 export function KeyboardControls({
   onStatusChange,
+  isHUD,
 }: {
   onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
+  isHUD?: boolean;
 }) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [shiftHeld, setShiftHeld] = useState(false);
@@ -65,6 +67,8 @@ export function KeyboardControls({
         z: curPos.z + (axis === "z" ? step * dir : 0),
       };
 
+      console.log(`[KeyboardControls] Nudge trigger: axis=${axis}, dir=${dir}, fine=${fine}, current=(${curPos.x.toFixed(3)}, ${curPos.y.toFixed(3)}, ${curPos.z.toFixed(3)}) -> target=(${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`);
+
       if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
         report("Keyboard blocked: invalid target coordinate", false, "invalid_target");
         return;
@@ -74,13 +78,13 @@ export function KeyboardControls({
       if (result.success) {
         const label = fine ? "fine" : "step";
         const sign = dir > 0 ? "+" : "-";
-        report(
-          `[${axis.toUpperCase()}${sign}][${label}] -> (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`,
-          true,
-        );
+        const msg = `[${axis.toUpperCase()}${sign}][${label}] -> (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`;
+        console.log(`[KeyboardControls] Move success: ${msg}`);
+        report(msg, true);
         return;
       }
 
+      console.warn(`[KeyboardControls] Move blocked: ${result.reason} (target: ${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`);
       report(`[${axis.toUpperCase()}] blocked: ${formatSafetyReason(result.reason)}`, false, result.reason);
     },
     [getEePos, report],
@@ -104,7 +108,35 @@ export function KeyboardControls({
         return false;
       }
 
-      const binding = KEY_BINDINGS.find((item) => item.key === key.toUpperCase());
+      let forceNormalStep = false;
+      const upperKey = key.toUpperCase();
+      let binding = KEY_BINDINGS.find((item) => item.key === upperKey);
+
+      // Support alternative gaming keyboard bindings: Arrow keys, Space, C, PageUp/PageDown, and direct X/Y/Z keys
+      if (!binding) {
+        if (key === "ArrowUp") binding = KEY_BINDINGS.find((b) => b.key === "W");
+        else if (key === "ArrowDown") binding = KEY_BINDINGS.find((b) => b.key === "S");
+        else if (key === "ArrowLeft") binding = KEY_BINDINGS.find((b) => b.key === "A");
+        else if (key === "ArrowRight") binding = KEY_BINDINGS.find((b) => b.key === "D");
+        else if (key === "Spacebar" || key === " " || key === "PageUp") binding = KEY_BINDINGS.find((b) => b.key === "Q");
+        else if (key === "c" || key === "C" || key === "PageDown") binding = KEY_BINDINGS.find((b) => b.key === "E");
+        else if (key === "x") binding = KEY_BINDINGS.find((b) => b.key === "D");
+        else if (key === "X") {
+          binding = KEY_BINDINGS.find((b) => b.key === "A");
+          forceNormalStep = true;
+        }
+        else if (key === "y") binding = KEY_BINDINGS.find((b) => b.key === "Q");
+        else if (key === "Y") {
+          binding = KEY_BINDINGS.find((b) => b.key === "E");
+          forceNormalStep = true;
+        }
+        else if (key === "z") binding = KEY_BINDINGS.find((b) => b.key === "W");
+        else if (key === "Z") {
+          binding = KEY_BINDINGS.find((b) => b.key === "S");
+          forceNormalStep = true;
+        }
+      }
+
       if (!binding) return false;
 
       const now = performance.now();
@@ -113,8 +145,9 @@ export function KeyboardControls({
       }
       lastMoveAtRef.current = now;
 
+      console.log(`[KeyboardControls] Key matched: ${key} -> mapped to binding: ${binding.key} (${binding.label})`);
       setActiveKey(binding.key);
-      handleNudge(binding.axis, binding.dir, shiftKey);
+      handleNudge(binding.axis, binding.dir, forceNormalStep ? false : shiftKey);
       return true;
     },
     [handleNudge],
@@ -144,6 +177,37 @@ export function KeyboardControls({
       window.removeEventListener("keyup", onKeyUp);
     };
   }, [handleKeyCommand]);
+
+  if (isHUD) {
+    return (
+      <div
+        ref={panelRef}
+        tabIndex={0}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          setActiveKey(null);
+          setShiftHeld(false);
+        }}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-md transition-all text-[10px] font-sans font-semibold cursor-pointer outline-none select-none ${
+          focused
+            ? "border-[--copper] bg-[--panel]/90 text-[--walnut-900]"
+            : "border-[--steel-400]/40 bg-[--panel]/70 text-[--steel-600] hover:border-[--copper]/40"
+        }`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${focused ? (shiftHeld ? "bg-amber-500 animate-pulse" : "bg-[--copper] animate-pulse") : "bg-slate-400"}`} />
+        <span>
+          {focused
+            ? feedback
+              ? feedback
+              : shiftHeld
+              ? "KB: FINE-STEP (5mm)"
+              : "KB: ACTIVE (WASD+QE)"
+            : "Click for Keyboard Control"}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
