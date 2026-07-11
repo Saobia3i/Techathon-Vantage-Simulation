@@ -8,6 +8,7 @@ import { useRobotStore } from "../state/robotStore";
 
 interface PinControlsProps {
   onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
+  isHUD?: boolean;
 }
 
 type PinValidation =
@@ -101,7 +102,7 @@ function validatePinInput(raw: string, availableKeys: string[]): PinValidation {
   };
 }
 
-export default function PinControls({ onStatusChange }: PinControlsProps) {
+export default function PinControls({ onStatusChange, isHUD }: PinControlsProps) {
   const keyPositions = useRobotStore((state) => state.keyPositions);
   const [pinInput, setPinInput] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
@@ -256,6 +257,74 @@ export default function PinControls({ onStatusChange }: PinControlsProps) {
   };
 
   const isValid = validation.ok;
+
+  if (isHUD) {
+    return (
+      <div className="rounded-lg bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 p-2 shadow-lg w-[210px] font-sans">
+        <div className="border-b border-[--steel-400]/30 pb-1 mb-1.5 flex items-center justify-between">
+          <span className="font-bold tracking-wider text-[--walnut-700] uppercase text-[8px]">PIN Autopilot</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${isExecuting ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
+        </div>
+        
+        {/* Compact input/display */}
+        <div className="flex gap-1.5 mb-1.5">
+          <input
+            type="text"
+            value={pinInput}
+            onChange={(e) => setPinInput(e.target.value)}
+            disabled={isExecuting}
+            className="flex-1 rounded border border-[--steel-400]/40 bg-white/70 px-2 py-0.5 text-[10px] font-mono text-[--walnut-900] outline-none text-center"
+            placeholder="PIN Code"
+          />
+          <button
+            onClick={executePin}
+            disabled={isExecuting || !isValid}
+            className={`px-2 h-[21px] rounded text-[9px] font-bold transition-colors cursor-pointer ${
+              isExecuting || !isValid
+                ? "bg-[--steel-200] border border-[--steel-400]/20 text-[--steel-600] opacity-50"
+                : "bg-[--walnut-700] border border-[--walnut-700] text-white hover:bg-[--copper]"
+            }`}
+          >
+            {isExecuting ? "Run..." : "Go"}
+          </button>
+        </div>
+
+        {/* Small Touch Keypad (like games) */}
+        <div className="grid grid-cols-4 gap-1">
+          {availableKeys.map((digit) => (
+            <button
+              key={digit}
+              disabled={isExecuting}
+              onClick={() => {
+                if (pinInput.length < PIN_LENGTH) {
+                  setPinInput((prev) => prev + digit);
+                }
+              }}
+              className="h-6 rounded border border-[--steel-400]/30 bg-[--steel-200]/70 text-[10px] font-bold text-[--walnut-900] hover:bg-[--copper] hover:text-white transition cursor-pointer active:scale-90"
+            >
+              {digit}
+            </button>
+          ))}
+          <button
+            disabled={isExecuting}
+            onClick={() => setPinInput("")}
+            className="col-span-2 h-6 rounded border border-red-200 bg-red-50 text-[9px] font-bold text-red-700 hover:bg-red-500 hover:text-white transition cursor-pointer active:scale-90"
+          >
+            Clear
+          </button>
+        </div>
+
+        {/* Status text */}
+        {(status !== "Ready for PIN input" || steps.length > 0) && (
+          <div className="mt-1.5 text-[8px] font-mono text-[--steel-600] border-t border-[--steel-400]/20 pt-1 leading-tight truncate">
+            {isExecuting 
+              ? `Step: ${steps.map(s => s.status === 'running' ? s.digit + '...' : '').filter(Boolean).join('') || 'Starting'}`
+              : status}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

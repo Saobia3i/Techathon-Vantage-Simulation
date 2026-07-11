@@ -11,70 +11,7 @@ import PinControls from "@/components/PinControls";
 import { JointPreviewOverlay } from "@/components/JointPreviewOverlay";
 import { formatSafetyReason } from "@/lib/safetyMessages";
 
-type SurfaceTab = "dashboard" | "joystick" | "keyboard" | "voice" | "pin";
-
-const TABS: { id: SurfaceTab; label: string; icon: React.ReactNode }[] = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="w-[15px] h-[15px] shrink-0">
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <line x1="3" y1="9" x2="21" y2="9" />
-        <line x1="9" y1="9" x2="9" y2="20" />
-      </svg>
-    ),
-  },
-  {
-    id: "joystick",
-    label: "Joystick",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="w-[15px] h-[15px] shrink-0">
-        <circle cx="12" cy="12" r="8" />
-        <circle cx="12" cy="12" r="2.4" />
-      </svg>
-    ),
-  },
-  {
-    id: "keyboard",
-    label: "Keyboard",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="w-[15px] h-[15px] shrink-0">
-        <rect x="2" y="6" width="20" height="12" rx="2" />
-        <line x1="6" y1="10" x2="6" y2="10" strokeLinecap="round" strokeWidth="2" />
-        <line x1="10" y1="10" x2="10" y2="10" strokeLinecap="round" strokeWidth="2" />
-        <line x1="14" y1="10" x2="14" y2="10" strokeLinecap="round" strokeWidth="2" />
-        <line x1="8" y1="14" x2="16" y2="14" strokeLinecap="round" strokeWidth="2" />
-      </svg>
-    ),
-  },
-  {
-    id: "voice",
-    label: "Voice",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="w-[15px] h-[15px] shrink-0">
-        <rect x="9" y="2" width="6" height="12" rx="3" />
-        <path d="M5 11a7 7 0 0 0 14 0" />
-        <line x1="12" y1="18" x2="12" y2="22" />
-      </svg>
-    ),
-  },
-  {
-    id: "pin",
-    label: "Autonomous PIN",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="w-[15px] h-[15px] shrink-0">
-        <rect x="4" y="8" width="16" height="12" rx="2" />
-        <circle cx="9" cy="14" r="1.2" />
-        <circle cx="15" cy="14" r="1.2" />
-        <path d="M8 8V5h8v3" />
-      </svg>
-    ),
-  },
-];
-
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<SurfaceTab>("dashboard");
   const [safetyStatus, setSafetyStatus] = useState<{
     ok: boolean;
     message: string;
@@ -84,162 +21,116 @@ export default function Home() {
     setSafetyStatus({ ok: success, message: success ? "Safety validator: pass" : formatSafetyReason(reason) });
   }, []);
 
-  const controlProps = { onStatusChange: handleStatusChange };
-
   return (
     <div className="min-h-screen bg-[--steel-100]">
-      <div style={{ maxWidth: "1320px", margin: "0 auto", padding: "28px 24px 64px" }}>
+      {/* Rotation alert overlay for mobile portrait mode */}
+      <div className="rotate-overlay">
+        <div className="flex flex-col items-center justify-center">
+          <svg className="animate-rotate w-14 h-14 text-[--copper] mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="5" y="2" width="14" height="20" rx="2" />
+            <circle cx="12" cy="19" r="1" />
+            <path d="M17 12a5 5 0 0 0-5-5m5 5H12" strokeLinecap="round" />
+            <path d="M7 12a5 5 0 0 0 5 5" strokeLinecap="round" />
+          </svg>
+          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "22px", fontWeight: 600, color: "var(--copper)", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Rotation Required
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--steel-300)", maxWidth: "260px", margin: 0, lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>
+            Please rotate your device to landscape mode for the digital twin simulator experience.
+          </p>
+        </div>
+      </div>
+
+      <div className="app-container">
 
         {/* ── Header ─────────────────────────────────────────────────── */}
-        <header
-          style={{ borderBottom: "2px solid var(--walnut-700)", paddingBottom: "16px", marginBottom: "18px" }}
-          className="flex items-end justify-between gap-6 flex-wrap"
-        >
+        <header className="app-header flex items-end justify-between gap-6 flex-wrap">
           <div>
             <p
+              className="app-tagline"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, letterSpacing: "0.12em", fontSize: "12px", color: "var(--copper)", margin: "0 0 4px", textTransform: "uppercase" }}
             >
               Techathon Nationals &middot; Rover Summit
             </p>
-            <h1
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: "30px", margin: 0, color: "var(--walnut-900)", letterSpacing: "0.01em" }}
-            >
+            <h1 className="app-title">
               Vantage Robotics — Digital Twin Control Suite
             </h1>
-            <p style={{ fontSize: "13px", color: "var(--steel-600)", margin: "5px 0 0" }}>
-              Single motion pipeline, five interchangeable control surfaces
+            <p className="app-subtitle" style={{ color: "var(--steel-600)" }}>
+              Integrated video game cockpit HUD — all controls active simultaneously
             </p>
           </div>
 
           {/* Dynamic safety status pill */}
           <div
-            className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[3px] whitespace-nowrap"
+            className="app-safety-pill flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[3px] whitespace-nowrap"
             style={{
               background: safetyStatus.ok ? "var(--safe-bg)" : "#FEE2E2",
               color: safetyStatus.ok ? "var(--safe-text)" : "#B91C1C",
             }}
           >
             <span
-              className="w-2 h-2 rounded-full"
+              className="w-2.5 h-2.5 rounded-full"
               style={{ background: safetyStatus.ok ? "var(--safe-text)" : "#B91C1C" }}
             />
             {safetyStatus.message}
           </div>
         </header>
 
-        {/* ── Surface Tabs ────────────────────────────────────────────── */}
-        <nav className="flex gap-1.5 mb-5 flex-wrap">
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[3px] border cursor-pointer transition-all"
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  background: isActive ? "var(--walnut-700)" : "var(--panel)",
-                  borderColor: isActive ? "var(--walnut-700)" : "var(--steel-400)",
-                  color: isActive ? "var(--steel-100)" : "var(--steel-600)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--copper)";
-                    (e.currentTarget as HTMLButtonElement).style.color = "var(--walnut-700)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--steel-400)";
-                    (e.currentTarget as HTMLButtonElement).style.color = "var(--steel-600)";
-                  }
-                }}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* ── Main Grid ────────────────────────────────────────────────── */}
-        {/* ── Main Grid ────────────────────────────────────────────────── */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 300px",
-            gap: "20px",
-            alignItems: "start",
-          }}
-          className="grid-layout"
-        >
-          {/* Column 1 — Scene View & Telemetry Panel (stacked vertically) */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* Scene View */}
-            <div
-              className="panel"
-              style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <p
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: "17px", color: "var(--walnut-900)", margin: 0, letterSpacing: "0.01em" }}
-                >
-                  Digital twin — scene view
-                </p>
-                <span className="text-[11px] font-mono text-[--steel-600]">
-                  urdf-loader &middot; Three.js
-                </span>
-              </div>
-
-              {/* 3D Viewport */}
-              <div
-                className="scene-grid-bg relative overflow-hidden"
-                style={{
-                  width: "100%",
-                  height: "460px",
-                  border: "1px solid var(--steel-200)",
-                  borderRadius: "3px",
-                }}
-              >
-                <SceneWrapper />
-                <JointPreviewOverlay />
-              </div>
-
-              <p style={{ fontSize: "12px", color: "var(--steel-600)", marginTop: "10px", marginBottom: 0 }}>
-                Rendered from the provided URDF via urdf-loader. Drag to orbit &middot; scroll to zoom &middot; right-drag to pan.{" "}
-                <b style={{ color: "var(--walnut-700)", fontWeight: 500 }}>Approach → touch → retract</b> per digit, verified within ±5 mm.
-              </p>
+        {/* ── Main Viewport and Telemetry ──────────────────────────────── */}
+        <div className="flex flex-col gap-4">
+          {/* 3D Viewport with Game HUD Overlays */}
+          <div className="scene-grid-bg scene-container relative overflow-hidden w-full border border-[--steel-400] rounded">
+            <SceneWrapper />
+            
+            {/* Top-Right Overlay: Telemetry Compass */}
+            <div className="absolute top-3 right-3 z-20 hud-scale-right">
+              <JointPreviewOverlay />
             </div>
 
-            {/* Telemetry (placed below scene view) */}
-            <div
-              style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
-            >
-              <TelemetryPanel />
+            {/* Top-Center Overlay: Keyboard Shortcuts Legend */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 hud-scale-top-center">
+              <div className="flex gap-3 bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-full px-3.5 py-1.5 text-[8.5px] font-sans font-semibold text-[--walnut-900] shadow-md select-none pointer-events-none uppercase tracking-wider whitespace-nowrap">
+                <span>W/S: ↔ Z (FWD/BACK)</span>
+                <span className="text-[--steel-400]/50">|</span>
+                <span>A/D: ↔ X (LEFT/RIGHT)</span>
+                <span className="text-[--steel-400]/50">|</span>
+                <span>Q/E: ↕ Y (UP/DOWN)</span>
+                <span className="text-[--steel-400]/50">|</span>
+                <span>Shift: Fine</span>
+              </div>
+            </div>
+
+            {/* Bottom-Left Overlay: Joystick Controls */}
+            <div className="absolute bottom-3 left-3 z-20 hud-scale-bottom-left">
+              <JoystickControl onStatusChange={handleStatusChange} isHUD={true} />
+            </div>
+
+            {/* Bottom-Right Overlay: Target & Nudges */}
+            <div className="absolute bottom-3 right-3 z-20 hud-scale-bottom-right">
+              <DashboardControls onStatusChange={handleStatusChange} isHUD={true} />
+            </div>
+
+            {/* Top-Left Overlay: Voice & PIN Keypad Stack */}
+            <div className="absolute top-3 left-3 z-20 flex flex-col gap-2 hud-scale-left">
+              <VoiceControlPanel onStatusChange={handleStatusChange} isHUD={true} />
+              <PinControls onStatusChange={handleStatusChange} isHUD={true} />
+            </div>
+
+            {/* Bottom-Center Overlay: Keyboard Status Pill */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
+              <KeyboardControls onStatusChange={handleStatusChange} isHUD={true} />
             </div>
           </div>
 
-          {/* Column 2 — Active Control Surface */}
-          <div
-            className="panel"
-            style={{ background: "var(--panel)", border: "1px solid var(--steel-400)", borderRadius: "4px", padding: "18px 20px" }}
-          >
-            <p
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, fontSize: "15px", color: "var(--walnut-700)", margin: "0 0 14px", textTransform: "uppercase", letterSpacing: "0.06em" }}
-            >
-              Control Surface — {TABS.find((t) => t.id === activeTab)?.label}
-            </p>
-
-            {activeTab === "dashboard" && <DashboardControls {...controlProps} />}
-            {activeTab === "joystick" && <JoystickControl {...controlProps} />}
-            {activeTab === "keyboard" && <KeyboardControls {...controlProps} />}
-            {activeTab === "voice" && <VoiceControlPanel {...controlProps} />}
-            {activeTab === "pin" && <PinControls {...controlProps} />}
+          {/* Under-Scene Telemetry Dashboard */}
+          <div className="telemetry-wrapper">
+            <TelemetryPanel />
           </div>
         </div>
 
         {/* ── Footer ─────────────────────────────────────────────────── */}
         <footer
+          className="app-footer"
           style={{ marginTop: "22px", paddingTop: "14px", borderTop: "1px solid var(--steel-200)", fontSize: "12px", color: "var(--steel-600)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}
         >
           <span>Vantage Robotics — Proposed Solution &middot; Rover Summit Dry Run</span>
@@ -251,8 +142,136 @@ export default function Home() {
       </div>
 
       <style>{`
+        :root {
+          --viewport-height: 600px;
+        }
+
+        .app-container {
+          max-width: 1320px;
+          margin: 0 auto;
+          padding: 28px 24px 64px;
+        }
+
+        .app-header {
+          border-bottom: 2px solid var(--walnut-700);
+          padding-bottom: 16px;
+          margin-bottom: 18px;
+        }
+
+        .app-title {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-weight: 600;
+          font-size: 30px;
+          margin: 0;
+          color: var(--walnut-900);
+          letter-spacing: 0.01em;
+        }
+
+        .app-subtitle {
+          font-size: 13px;
+          margin: 5px 0 0;
+        }
+
+        .scene-container {
+          height: var(--viewport-height);
+          transition: height 0.3s ease;
+        }
+
+        .telemetry-wrapper {
+          background: var(--panel);
+          border: 1px solid var(--steel-400);
+          border-radius: 4px;
+          padding: 18px 20px;
+        }
+
+        .rotate-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(26, 22, 19, 0.96);
+          backdrop-filter: blur(12px);
+          z-index: 99999;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: var(--steel-100);
+          text-align: center;
+          padding: 24px;
+        }
+
+        @keyframes rotate-phone {
+          0% { transform: rotate(0deg); }
+          50% { transform: rotate(-90deg); }
+          100% { transform: rotate(-90deg); }
+        }
+        
+        .animate-rotate {
+          animation: rotate-phone 2.2s ease-in-out infinite;
+        }
+
         @media (max-width: 960px) {
-          .grid-layout { grid-template-columns: 1fr !important; }
+          :root {
+            --viewport-height: 310px;
+          }
+          .app-container {
+            padding: 8px 12px 16px !important;
+          }
+          .app-header {
+            padding-bottom: 8px !important;
+            margin-bottom: 8px !important;
+          }
+          .app-tagline {
+            font-size: 10px !important;
+            margin-bottom: 2px !important;
+          }
+          .app-title {
+            font-size: 18px !important;
+          }
+          .app-subtitle {
+            font-size: 10px !important;
+            margin-top: 1px !important;
+          }
+          .app-safety-pill {
+            font-size: 10px !important;
+            padding: 4px 8px !important;
+          }
+          .telemetry-wrapper {
+            padding: 8px 12px !important;
+          }
+          .app-footer {
+            margin: 12px 0 0 !important;
+            padding-top: 8px !important;
+            font-size: 10px !important;
+          }
+          .hud-scale-left {
+            transform: scale(0.65);
+            transform-origin: top left;
+          }
+          .hud-scale-right {
+            transform: scale(0.65);
+            transform-origin: top right;
+          }
+          .hud-scale-bottom-left {
+            transform: scale(0.65);
+            transform-origin: bottom left;
+          }
+          .hud-scale-bottom-right {
+            transform: scale(0.65);
+            transform-origin: bottom right;
+          }
+          .hud-scale-top-center {
+            transform: scale(0.65);
+            transform-origin: top center;
+          }
+        }
+
+        @media (max-width: 960px) and (orientation: portrait) {
+          .rotate-overlay {
+            display: flex;
+          }
+          .app-container {
+            display: none !important;
+          }
         }
       `}</style>
     </div>

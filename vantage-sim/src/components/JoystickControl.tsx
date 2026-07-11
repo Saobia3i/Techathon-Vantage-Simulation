@@ -8,6 +8,7 @@ import { useRobotStore } from "@/state/robotStore";
 
 type Props = {
   onStatusChange?: (msg: string, success: boolean, reason?: string) => void;
+  isHUD?: boolean;
 };
 
 type WorldPos = { x: number; y: number; z: number };
@@ -32,7 +33,7 @@ function formatPos(pos: WorldPos) {
   return `(${pos.x.toFixed(3)}, ${pos.y.toFixed(3)}, ${pos.z.toFixed(3)})`;
 }
 
-export function JoystickControl({ onStatusChange }: Props) {
+export function JoystickControl({ onStatusChange, isHUD }: Props) {
   const padRef = useRef<HTMLDivElement>(null);
   const lastMoveAtRef = useRef(0);
   const dragVectorRef = useRef({ x: 0, z: 0 });
@@ -193,6 +194,77 @@ export function JoystickControl({ onStatusChange }: Props) {
 
     driveTo({ x: current.x, y: nextY, z: current.z }, "Height");
   };
+
+  if (isHUD) {
+    return (
+      <div className="rounded-lg bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 p-2.5 shadow-lg w-[210px] font-sans flex flex-col gap-2">
+        <div className="border-b border-[--steel-400]/30 pb-1 flex items-center justify-between">
+          <span className="font-bold tracking-wider text-[--walnut-700] uppercase text-[8px]">Flight Joystick</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+        </div>
+        <div className="flex gap-2 items-center justify-between">
+          {/* X/Z Pad */}
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[8px] font-bold text-[--steel-600] uppercase tracking-wider">X / Z Pad</span>
+            <div
+              ref={padRef}
+              onPointerDown={startDrag}
+              onPointerMove={moveDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              className="relative rounded-full border border-[--steel-400] bg-[--panel] shadow-inner"
+              style={{
+                width: 90,
+                height: 90,
+                touchAction: "none",
+                cursor: dragging ? "grabbing" : "grab",
+                background: "radial-gradient(circle at 50% 50%, rgba(184,118,63,0.15), rgba(246,244,240,0.96) 65%)",
+              }}
+            >
+              <div className="absolute left-1/2 top-1/2 h-[1px] w-[64px] -translate-x-1/2 bg-[--steel-300]/60" />
+              <div className="absolute left-1/2 top-1/2 h-[64px] w-[1px] -translate-y-1/2 bg-[--steel-300]/60" />
+              <div
+                className="absolute rounded-full border border-white/40 bg-[--walnut-900] shadow-md"
+                style={{
+                  width: 26,
+                  height: 26,
+                  left: `calc(50% - 13px + ${stick.x * (90/JOYSTICK_SIZE)}px)`,
+                  top: `calc(50% - 13px + ${stick.y * (90/JOYSTICK_SIZE)}px)`,
+                  transition: dragging ? "none" : "left 120ms ease, top 120ms ease",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Y Slider */}
+          <div className="flex flex-col items-center gap-1 border-l border-[--steel-300]/50 pl-2">
+            <span className="text-[8px] font-bold text-[--steel-600] uppercase tracking-wider">Y Lift</span>
+            <div className="flex items-center gap-1 h-[90px]">
+              <input
+                type="range"
+                min={MIN_Y}
+                max={MAX_Y}
+                step="0.01"
+                value={height}
+                onChange={handleHeightChange}
+                className="cursor-pointer"
+                style={{
+                  writingMode: "vertical-lr" as React.CSSProperties["writingMode"],
+                  direction: "rtl",
+                  height: 75,
+                  width: 14,
+                  accentColor: "var(--copper)",
+                }}
+              />
+              <span className="text-[8px] font-mono font-bold text-[--walnut-700] w-[30px] text-right">
+                {height.toFixed(2)}m
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

@@ -69,16 +69,16 @@ export function JointPreviewOverlay() {
     }
 
     // Floor line
-    const floorY = height - 15;
+    const floorY = height - 8;
     ctx.strokeStyle = "rgba(122, 119, 110, 0.4)";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(5, floorY);
     ctx.lineTo(width - 5, floorY);
     ctx.stroke();
-    ctx.fillStyle = "rgba(122, 119, 110, 0.2)";
-    ctx.font = "italic 7px sans-serif";
-    ctx.fillText("GROUND (Y=0.0)", 8, floorY - 4);
+    ctx.fillStyle = "rgba(122, 119, 110, 0.25)";
+    ctx.font = "italic 6px sans-serif";
+    ctx.fillText("GROUND (Y=0.0)", 8, floorY - 3);
 
     // Collect 3D positions of the joints in world space
     const jointsChain = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"];
@@ -119,10 +119,10 @@ export function JointPreviewOverlay() {
 
     // Projection mapping from 3D to 2D canvas:
     // We map side-profile: horizontal = Z extension (robot is rotated), vertical = Y height.
-    // Center the base at x = 35px, y = floorY
-    const scaleZ = 110; // px/m (scaled down from 165 for compact view)
-    const scaleY = 110; // px/m (scaled up from 165 for compact view)
-    const originX = 35;
+    // Center the base at x = 25px, y = floorY
+    const scaleZ = 70; // px/m (scaled down to fit 70px height)
+    const scaleY = 70; // px/m (scaled down to fit 70px height)
+    const originX = 25;
 
     const projected = points.map((p) => {
       // Calculate radial extension or direct Z
@@ -176,7 +176,7 @@ export function JointPreviewOverlay() {
       const showLabel = p.name === "joint2" || p.name === "joint3" || p.name === "joint5" || p.name === "tip" || p.name === "joint1";
       if (showLabel) {
         ctx.fillStyle = "rgb(42, 29, 20)";
-        ctx.font = "bold 7.2px monospace";
+        ctx.font = "bold 6.5px monospace";
         let labelText = "";
         
         if (p.name === "tip") {
@@ -188,16 +188,16 @@ export function JointPreviewOverlay() {
         }
 
         // Offset label coordinates dynamically to prevent overlap
-        let ox = 6;
+        let ox = 5;
         let oy = 2;
-        if (p.name === "joint3") { ox = -38; oy = -4; }
-        if (p.name === "joint1") { ox = 6; oy = -1; }
-        if (p.name === "tip") { ox = 6; oy = -1; }
+        if (p.name === "joint3") { ox = -36; oy = -3; }
+        if (p.name === "joint1") { ox = 5; oy = -1; }
+        if (p.name === "tip") { ox = 5; oy = -1; }
 
-        ctx.fillStyle = "rgba(246, 244, 240, 0.9)";
-        ctx.fillRect(p.cx + ox - 2, p.cy + oy - 7, ctx.measureText(labelText).width + 4, 9);
+        ctx.fillStyle = "rgba(246, 244, 240, 0.92)";
+        ctx.fillRect(p.cx + ox - 1, p.cy + oy - 6, ctx.measureText(labelText).width + 2, 8);
         ctx.strokeStyle = "rgba(169, 166, 156, 0.3)";
-        ctx.strokeRect(p.cx + ox - 2, p.cy + oy - 7, ctx.measureText(labelText).width + 4, 9);
+        ctx.strokeRect(p.cx + ox - 1, p.cy + oy - 6, ctx.measureText(labelText).width + 2, 8);
 
         ctx.fillStyle = "rgb(42, 29, 20)";
         ctx.fillText(labelText, p.cx + ox, p.cy + oy);
@@ -208,7 +208,7 @@ export function JointPreviewOverlay() {
   if (!robot || jointNames.length === 0) return null;
 
   return (
-    <div className="absolute bottom-3 left-3 z-20 w-[210px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-2.5 shadow-lg font-mono text-[9px] text-[--walnut-900] select-none">
+    <div className="w-[210px] bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 rounded-lg p-2.5 shadow-lg font-mono text-[9px] text-[--walnut-900] select-none">
       <div className="border-b border-[--steel-400]/30 pb-1 mb-1.5 flex items-center justify-between">
         <span className="font-bold tracking-wider text-[--walnut-700] uppercase font-sans text-[8px]">
           TELEMETRY COMPASS
@@ -222,8 +222,8 @@ export function JointPreviewOverlay() {
           <canvas
             ref={canvasRef}
             width={184}
-            height={105}
-            className="block w-full h-[105px]"
+            height={70}
+            className="block w-full h-[70px]"
           />
         </div>
       </div>
