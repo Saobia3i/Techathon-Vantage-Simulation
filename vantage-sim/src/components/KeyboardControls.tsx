@@ -1,26 +1,27 @@
 "use client";
 
-import { useRobotStore } from "@/state/robotStore";
+import { useCallback, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 import { moveToSmooth as moveTo } from "@/lib/animateArm";
 import { formatSafetyReason } from "@/lib/safetyMessages";
 import { getStylusTipWorldPosition } from "@/lib/stylusTip";
-import * as THREE from "three";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useRobotStore } from "@/state/robotStore";
 
-const STEP_NORMAL = 0.02;  // 2 cm
-const STEP_FINE   = 0.005; // 5 mm — teammate's Shift fine-step
-
+const STEP_NORMAL = 0.02;
+const STEP_FINE = 0.005;
 const KEYBOARD_MOVE_MS = 95;
 const KEY_REPEAT_THROTTLE_MS = 85;
 
 const KEY_BINDINGS = [
-  { key: "W", axis: "z" as const, dir: -1, label: "Forward (−Z)" },
-  { key: "S", axis: "z" as const, dir: 1,  label: "Backward (+Z)" },
-  { key: "A", axis: "x" as const, dir: -1, label: "Left (−X)" },
-  { key: "D", axis: "x" as const, dir: 1,  label: "Right (+X)" },
-  { key: "Q", axis: "y" as const, dir: 1,  label: "Up (+Y)" },
-  { key: "E", axis: "y" as const, dir: -1, label: "Down (−Y)" },
+  { key: "W", axis: "z" as const, dir: -1, label: "Forward (-Z)" },
+  { key: "S", axis: "z" as const, dir: 1, label: "Backward (+Z)" },
+  { key: "A", axis: "x" as const, dir: -1, label: "Left (-X)" },
+  { key: "D", axis: "x" as const, dir: 1, label: "Right (+X)" },
+  { key: "Q", axis: "y" as const, dir: 1, label: "Up (+Y)" },
+  { key: "E", axis: "y" as const, dir: -1, label: "Down (-Y)" },
 ];
+
+type Axis = "x" | "y" | "z";
 
 export function KeyboardControls({
   onStatusChange,
@@ -40,14 +41,20 @@ export function KeyboardControls({
     return getStylusTipWorldPosition(robot, stylusLinkName);
   }, []);
 
+  const report = useCallback(
+    (msg: string, success: boolean, reason?: string) => {
+      setIsSuccess(success);
+      setFeedback(msg);
+      onStatusChange?.(msg, success, reason);
+    },
+    [onStatusChange],
+  );
+
   const handleNudge = useCallback(
-    (axis: "x" | "y" | "z", dir: number, fine: boolean) => {
+    (axis: Axis, dir: number, fine: boolean) => {
       const curPos = getEePos();
       if (!curPos) {
-        const msg = "Keyboard blocked: robot or stylus tip is not loaded";
-        setIsSuccess(false);
-        setFeedback(msg);
-        onStatusChange?.(msg, false, "robot_not_loaded");
+        report("Keyboard blocked: robot or stylus tip is not loaded", false, "robot_not_loaded");
         return;
       }
 
@@ -59,28 +66,24 @@ export function KeyboardControls({
       };
 
       if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
-        const msg = "Keyboard blocked: invalid target coordinate";
-        setIsSuccess(false);
-        setFeedback(msg);
-        onStatusChange?.(msg, false, "invalid_target");
+        report("Keyboard blocked: invalid target coordinate", false, "invalid_target");
         return;
       }
 
-      const res = moveTo(target, KEYBOARD_MOVE_MS);
-      if (res.success) {
-        setIsSuccess(true);
+      const result = moveTo(target, KEYBOARD_MOVE_MS);
+      if (result.success) {
         const label = fine ? "fine" : "step";
-        const msg = `[${axis.toUpperCase()}${dir > 0 ? "+" : "−"}][${label}] → (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`;
-        setFeedback(msg);
-        onStatusChange?.(msg, true);
-      } else {
-        setIsSuccess(false);
-        const msg = `[${axis.toUpperCase()}] blocked: ${formatSafetyReason(res.reason)}`;
-        setFeedback(msg);
-        onStatusChange?.(msg, false, res.reason);
+        const sign = dir > 0 ? "+" : "-";
+        report(
+          `[${axis.toUpperCase()}${sign}][${label}] -> (${target.x.toFixed(3)}, ${target.y.toFixed(3)}, ${target.z.toFixed(3)})`,
+          true,
+        );
+        return;
       }
+
+      report(`[${axis.toUpperCase()}] blocked: ${formatSafetyReason(result.reason)}`, false, result.reason);
     },
-    [getEePos, onStatusChange]
+    [getEePos, report],
   );
 
   const handleKeyCommand = useCallback(
@@ -101,7 +104,7 @@ export function KeyboardControls({
         return false;
       }
 
-      const binding = KEY_BINDINGS.find((b) => b.key === key.toUpperCase());
+      const binding = KEY_BINDINGS.find((item) => item.key === key.toUpperCase());
       if (!binding) return false;
 
       const now = performance.now();
@@ -110,7 +113,7 @@ export function KeyboardControls({
       }
       lastMoveAtRef.current = now;
 
-      setActiveKey(key.toUpperCase());
+      setActiveKey(binding.key);
       handleNudge(binding.axis, binding.dir, shiftKey);
       return true;
     },
@@ -123,16 +126,17 @@ export function KeyboardControls({
   }, []);
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const handled = handleKeyCommand(e.key, e.shiftKey, e.target);
-      if (!handled) return;
-      e.preventDefault();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const handled = handleKeyCommand(event.key, event.shiftKey, event.target);
+      if (handled) event.preventDefault();
     };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") setShiftHeld(false);
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Shift") setShiftHeld(false);
       setActiveKey(null);
     };
+
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => {
@@ -148,18 +152,19 @@ export function KeyboardControls({
           Keyboard control surface
         </p>
         <p className="text-[11px] text-[--steel-600] font-sans mb-3">
-          Use WASD + QE while this tab is open. Click the zone below only if you want the active indicator.{" "}
-          <kbd className="px-1 py-0.5 rounded border border-[--steel-400] bg-white text-[10px] font-mono text-[--walnut-900]">⇧ Shift</kbd>{" "}
-          <span className="text-[11px]">enables fine-step (5 mm).</span>
+          Use WASD + QE while this tab is open. Shift enables fine-step (5 mm).
         </p>
       </div>
 
-      {/* Activation zone */}
       <div
         ref={panelRef}
         tabIndex={0}
         onFocus={() => setFocused(true)}
-        onBlur={() => { setFocused(false); setActiveKey(null); setShiftHeld(false); }}
+        onBlur={() => {
+          setFocused(false);
+          setActiveKey(null);
+          setShiftHeld(false);
+        }}
         onKeyDown={(event) => {
           if (event.ctrlKey || event.metaKey || event.altKey) return;
           const handled = handleKeyCommand(event.key, event.shiftKey, event.target);
@@ -172,7 +177,7 @@ export function KeyboardControls({
           if (event.key === "Shift") setShiftHeld(false);
           setActiveKey(null);
         }}
-        className={`relative flex items-center justify-center h-20 rounded border-2 cursor-pointer select-none outline-none transition-all ${
+        className={`relative flex h-20 cursor-pointer select-none items-center justify-center rounded border-2 outline-none transition-all ${
           focused
             ? shiftHeld
               ? "border-amber-500 bg-amber-50"
@@ -182,8 +187,8 @@ export function KeyboardControls({
       >
         <span className="text-sm font-sans font-medium text-[--steel-600]">
           {focused ? (
-            <span className={`font-semibold flex items-center gap-2 ${shiftHeld ? "text-amber-600" : "text-[--copper]"}`}>
-              <span className={`w-2 h-2 rounded-full animate-pulse inline-block ${shiftHeld ? "bg-amber-500" : "bg-[--copper]"}`} />
+            <span className={`flex items-center gap-2 font-semibold ${shiftHeld ? "text-amber-600" : "text-[--copper]"}`}>
+              <span className={`inline-block h-2 w-2 animate-pulse rounded-full ${shiftHeld ? "bg-amber-500" : "bg-[--copper]"}`} />
               {shiftHeld ? "FINE-STEP active (5 mm)" : "Keyboard controls: ACTIVE"}
             </span>
           ) : (
@@ -192,22 +197,23 @@ export function KeyboardControls({
         </span>
       </div>
 
-      {/* Key bindings table */}
       <div className="grid grid-cols-2 gap-1.5">
         {KEY_BINDINGS.map(({ key, label }) => (
           <div
             key={key}
-            className={`flex items-center gap-2 p-2 rounded border text-xs font-sans transition-all ${
+            className={`flex items-center gap-2 rounded border p-2 text-xs font-sans transition-all ${
               activeKey === key
                 ? "border-[--copper] bg-[--copper]/10 text-[--walnut-900]"
                 : "border-[--steel-200] bg-[--panel] text-[--steel-600]"
             }`}
           >
-            <kbd className={`px-1.5 py-0.5 rounded font-mono font-bold text-[11px] border ${
-              activeKey === key
-                ? "bg-[--copper] text-white border-[--copper]"
-                : "bg-white text-[--walnut-900] border-[--steel-400]"
-            }`}>
+            <kbd
+              className={`rounded border px-1.5 py-0.5 font-mono text-[11px] font-bold ${
+                activeKey === key
+                  ? "border-[--copper] bg-[--copper] text-white"
+                  : "border-[--steel-400] bg-white text-[--walnut-900]"
+              }`}
+            >
               {key}
             </kbd>
             <span>{label}</span>
@@ -216,9 +222,13 @@ export function KeyboardControls({
       </div>
 
       {feedback && (
-        <div className={`p-2.5 rounded text-xs border font-mono ${
-          isSuccess ? "bg-[--safe-bg] border-[--safe-text]/30 text-[--safe-text]" : "bg-red-50 border-red-200 text-red-700"
-        }`}>
+        <div
+          className={`rounded border p-2.5 font-mono text-xs ${
+            isSuccess
+              ? "bg-[--safe-bg] border-[--safe-text]/30 text-[--safe-text]"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
           {feedback}
         </div>
       )}
