@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cancelArmAnimation, moveToSmooth as moveTo } from "../lib/animateArm";
-import { moveTo as validateMoveTo } from "../lib/moveTo";
+import { moveToSmooth as moveTo } from "../lib/animateArm";
 import { formatSafetyReason } from "@/lib/safetyMessages";
 import { useRobotStore } from "../state/robotStore";
 
@@ -22,31 +21,12 @@ type StepState = {
   message: string;
 };
 
-type MotionTarget = { x: number; y: number; z: number };
-
-type PinMotionStep = {
-  index: number;
-  digit: string;
-  phase: "approach" | "touch" | "retract";
-  target: MotionTarget;
-};
-
 const PIN_LENGTH = 6;
 const APPROACH_LIFT_METERS = 0.055;
 const DWELL_MS = 450;
 const TRAVEL_MS = 680;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function restoreRobotPose(angles: number[]) {
-  const { robot, jointNames } = useRobotStore.getState();
-  if (!robot) return;
-  jointNames.forEach((name, index) => {
-    robot.setJointValue(name, angles[index] ?? 0);
-  });
-  robot.updateMatrixWorld(true);
-  useRobotStore.getState().setCurrentAngles(angles);
-}
 
 function validatePinInput(raw: string, availableKeys: string[]): PinValidation {
   const normalized = raw.replace(/[\s,-]/g, "");
@@ -109,7 +89,10 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
   const [status, setStatus] = useState("Ready for PIN input");
   const [steps, setSteps] = useState<StepState[]>([]);
 
-  const availableKeys = useMemo(() => Object.keys(keyPositions).sort((a, b) => Number(a) - Number(b)), [keyPositions]);
+  const availableKeys = useMemo(
+    () => Object.keys(keyPositions).sort((a, b) => Number(a) - Number(b)),
+    [keyPositions],
+  );
   const validation = useMemo(
     () => validatePinInput(pinInput, availableKeys),
     [pinInput, availableKeys],
@@ -126,51 +109,6 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
     onStatusChange?.(msg, success, reason);
   };
 
-  const buildMotionPlan = (sequence: string[]): PinMotionStep[] => {
-    return sequence.flatMap((digit, index) => {
-      const target = keyPositions[digit];
-      const approach = { x: target.x, y: target.y + APPROACH_LIFT_METERS, z: target.z };
-      return [
-        { index, digit, phase: "approach" as const, target: approach },
-        { index, digit, phase: "touch" as const, target },
-        { index, digit, phase: "retract" as const, target: approach },
-      ];
-    });
-  };
-
-  const preflightMotionPlan = (
-    plan: PinMotionStep[],
-  ): { ok: true } | { ok: false; step: PinMotionStep; reason?: string; message: string } => {
-    const { robot, jointNames } = useRobotStore.getState();
-    if (!robot || jointNames.length === 0) {
-      return {
-        ok: false,
-        step: plan[0],
-        reason: "robot_not_loaded",
-        message: "PIN rejected before motion: robot is not loaded.",
-      };
-    }
-
-    cancelArmAnimation();
-    const originalAngles = jointNames.map((name) => (robot.joints[name]?.angle as number) ?? 0);
-
-    for (const step of plan) {
-      const result = validateMoveTo(step.target);
-      if (!result.success) {
-        restoreRobotPose(originalAngles);
-        return {
-          ok: false,
-          step,
-          reason: result.reason,
-          message: `PIN rejected before motion at key ${step.digit} ${step.phase}: ${formatSafetyReason(result.reason)}`,
-        };
-      }
-    }
-
-    restoreRobotPose(originalAngles);
-    return { ok: true };
-  };
-
   const executePin = async () => {
     if (isExecuting) return;
 
@@ -179,7 +117,7 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
       return;
     }
 
-    const motionPlan = buildMotionPlan(validation.sequence);
+    setIsExecuting(true);
     setSteps(
       validation.sequence.map((digit, index) => ({
         index,
@@ -188,16 +126,6 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
         message: "Waiting",
       })),
     );
-
-    report(`Preflight validating PIN: ${validation.sequence.join(" -> ")}`, true);
-    const preflight = preflightMotionPlan(motionPlan);
-    if (!preflight.ok) {
-      setStepStatus(preflight.step.index, "failed", preflight.message);
-      report(preflight.message, false, preflight.reason);
-      return;
-    }
-
-    setIsExecuting(true);
     report(`Starting validated PIN: ${validation.sequence.join(" -> ")}`, true);
 
     for (let index = 0; index < validation.sequence.length; index++) {
@@ -258,6 +186,7 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
 
   const isValid = validation.ok;
 
+  // ── HUD Compact View ────────────────────────────────────────────────────
   if (isHUD) {
     return (
       <div className="rounded-lg bg-[--panel]/85 backdrop-blur-md border border-[--steel-400]/40 p-2 shadow-lg w-[210px] font-sans">
@@ -265,67 +194,77 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
           <span className="font-bold tracking-wider text-[--walnut-700] uppercase text-[8px]">PIN Autopilot</span>
           <span className={`w-1.5 h-1.5 rounded-full ${isExecuting ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
         </div>
-        
-        {/* Compact input/display */}
-        <div className="flex gap-1.5 mb-1.5">
-          <input
-            type="text"
-            value={pinInput}
-            onChange={(e) => setPinInput(e.target.value)}
-            disabled={isExecuting}
-            className="flex-1 rounded border border-[--steel-400]/40 bg-white/70 px-2 py-0.5 text-[10px] font-mono text-[--walnut-900] outline-none text-center"
-            placeholder="PIN Code"
-          />
-          <button
-            onClick={executePin}
-            disabled={isExecuting || !isValid}
-            className={`px-2 h-[21px] rounded text-[9px] font-bold transition-colors cursor-pointer ${
-              isExecuting || !isValid
-                ? "bg-[--steel-200] border border-[--steel-400]/20 text-[--steel-600] opacity-50"
-                : "bg-[--walnut-700] border border-[--walnut-700] text-white hover:bg-[--copper]"
-            }`}
-          >
-            {isExecuting ? "Run..." : "Go"}
-          </button>
+
+        {/* PIN display */}
+        <div className={`mb-1.5 rounded border px-2 py-1 text-center font-mono text-[12px] tracking-[0.25em] ${
+          isValid ? "border-emerald-400/60 bg-emerald-50/60 text-emerald-800" :
+          pinInput.length > 0 ? "border-red-300/60 bg-red-50/60 text-red-800" :
+          "border-[--steel-400]/30 bg-white/60 text-[--steel-500]"
+        }`}>
+          {pinInput.length > 0 ? pinInput.padEnd(PIN_LENGTH, "·") : "· · · · · ·"}
         </div>
 
-        {/* Small Touch Keypad (like games) */}
-        <div className="grid grid-cols-4 gap-1">
+        {/* Digit keypad — only loaded keys */}
+        <div className="grid grid-cols-3 gap-1 mb-1">
           {availableKeys.map((digit) => (
             <button
               key={digit}
-              disabled={isExecuting}
-              onClick={() => {
-                if (pinInput.length < PIN_LENGTH) {
-                  setPinInput((prev) => prev + digit);
-                }
-              }}
-              className="h-6 rounded border border-[--steel-400]/30 bg-[--steel-200]/70 text-[10px] font-bold text-[--walnut-900] hover:bg-[--copper] hover:text-white transition cursor-pointer active:scale-90"
+              disabled={isExecuting || pinInput.length >= PIN_LENGTH}
+              onClick={() => setPinInput((prev) => (prev.length < PIN_LENGTH ? prev + digit : prev))}
+              className="h-7 rounded border border-[--steel-400]/30 bg-[--steel-200]/70 text-[11px] font-bold text-[--walnut-900] hover:bg-[--copper] hover:text-white transition cursor-pointer active:scale-90 disabled:opacity-40"
             >
               {digit}
             </button>
           ))}
+        </div>
+
+        {/* Action row: Backspace | Clear | Run */}
+        <div className="grid grid-cols-3 gap-1">
           <button
-            disabled={isExecuting}
-            onClick={() => setPinInput("")}
-            className="col-span-2 h-6 rounded border border-red-200 bg-red-50 text-[9px] font-bold text-red-700 hover:bg-red-500 hover:text-white transition cursor-pointer active:scale-90"
+            disabled={isExecuting || pinInput.length === 0}
+            onClick={() => setPinInput((prev) => prev.slice(0, -1))}
+            className="h-7 rounded border border-[--steel-400]/40 bg-[--steel-100] text-[11px] font-bold text-[--walnut-700] hover:bg-[--steel-200] transition cursor-pointer active:scale-90 disabled:opacity-40"
+            title="Backspace"
           >
-            Clear
+            ⌫
+          </button>
+          <button
+            disabled={isExecuting || pinInput.length === 0}
+            onClick={() => setPinInput("")}
+            className="h-7 rounded border border-red-200 bg-red-50 text-[9px] font-bold text-red-700 hover:bg-red-500 hover:text-white transition cursor-pointer active:scale-90 disabled:opacity-40"
+          >
+            CLR
+          </button>
+          <button
+            onClick={executePin}
+            disabled={isExecuting || !isValid}
+            className={`h-7 rounded border text-[9px] font-bold transition cursor-pointer active:scale-90 ${
+              isExecuting
+                ? "border-amber-400 bg-amber-100 text-amber-700"
+                : isValid
+                ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+                : "border-[--steel-400] bg-[--steel-100] text-[--steel-500] cursor-not-allowed"
+            }`}
+          >
+            {isExecuting ? "…" : "RUN"}
           </button>
         </div>
 
-        {/* Status text */}
-        {(status !== "Ready for PIN input" || steps.length > 0) && (
-          <div className="mt-1.5 text-[8px] font-mono text-[--steel-600] border-t border-[--steel-400]/20 pt-1 leading-tight truncate">
-            {isExecuting 
-              ? `Step: ${steps.map(s => s.status === 'running' ? s.digit + '...' : '').filter(Boolean).join('') || 'Starting'}`
-              : status}
+        {/* Validation / execution feedback */}
+        {(pinInput.length > 0 || isExecuting) && (
+          <div className={`mt-1.5 text-[8px] font-mono leading-tight border-t border-[--steel-400]/20 pt-1 ${
+            isExecuting ? "text-amber-700" : isValid ? "text-emerald-600" : "text-red-600"
+          }`}>
+            {isExecuting
+              ? steps.map((s) => (s.status === "running" ? `Key ${s.digit}...` : "")).filter(Boolean).join("") || "Starting…"
+              : validation.message}
           </div>
         )}
       </div>
     );
   }
 
+  // ── Full Panel View (Tab) ───────────────────────────────────────────────
   return (
     <div className="space-y-5">
       <div>
@@ -351,6 +290,7 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
           inputMode="numeric"
         />
 
+        {/* Live validation box */}
         <div
           className={`rounded border p-2.5 text-xs font-sans ${
             isValid
@@ -367,7 +307,7 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
         <button
           onClick={executePin}
           disabled={isExecuting || !isValid}
-          className="w-full px-4 py-2 rounded border text-sm font-semibold transition-colors"
+          className="w-full px-4 py-2 rounded border text-sm font-semibold transition-colors cursor-pointer"
           style={{
             backgroundColor: isExecuting || !isValid ? "var(--steel-200)" : "var(--walnut-700)",
             borderColor: isExecuting || !isValid ? "var(--steel-400)" : "var(--walnut-700)",
@@ -378,6 +318,7 @@ export default function PinControls({ onStatusChange, isHUD }: PinControlsProps)
         </button>
       </div>
 
+      {/* Step-by-step output */}
       <div className="rounded border border-[--steel-400] p-3 space-y-2">
         <p className="text-[11px] font-bold text-[--walnut-700] uppercase tracking-wider font-sans">
           Validated Output
